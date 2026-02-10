@@ -1,0 +1,15 @@
+# Telegram
+python-telegram-bot>=21.0
+
+# Database
+sqlalchemy>=2.0
+
+# HTTP / parsing (по необходимости)
+httpx>=0.27
+# beautifulsoup4>=4.12
+
+# R2 / S3 (по необходимости)
+# boto3>=1.34
+
+# Env
+python-dotenv>=1.0

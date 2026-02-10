@@ -1,0 +1,1 @@
+"""flatscanner-bot application."""
