@@ -12,6 +12,7 @@
 - [x] Update `CLAUDE.md` with implementation and PR expectations
 - [x] Add a durable ADR for the AI development workflow
 - [x] Add a durable operations guide for the AI PR loop
+- [x] Add a Claude-facing playbook for opening, monitoring, and fixing PRs
 
 ## GitHub Workflow
 
