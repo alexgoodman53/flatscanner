@@ -30,3 +30,5 @@ This repository expects automated PR review to run on a Windows self-hosted GitH
 - Require status checks `CI`, `PR Guard`, and `AI Review`
 - Require at least one human approval
 - Restrict direct pushes to `main`
+
+Smoke test note: this line verifies the Claude PR fix workflow.
