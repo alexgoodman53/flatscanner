@@ -2,25 +2,149 @@ name: AI Review
 
 on:
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  placeholder-review:
+  codex-review:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Review readiness summary
+      - name: Validate OpenAI secret
+        shell: bash
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${OPENAI_API_KEY:-}" ]; then
+            echo "OPENAI_API_KEY is not configured."
+            echo "Add it in GitHub Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+      - name: Fetch base and head refs
+        if: github.event_name == 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
-          echo "AI review scaffold is present."
-          echo "Next step: configure Codex authentication and invocation for pull request reviews."
-          echo "Expected inputs:"
-          echo "- repository checkout"
-          echo "- PR diff"
-          echo "- project context from AGENTS.md and specs/"
-          echo
-          echo "This workflow currently passes as a placeholder so it can be added to required checks without blocking early setup."
+          git fetch --no-tags origin "${{ github.event.pull_request.base.ref }}"
+          git fetch --no-tags origin "+refs/pull/${{ github.event.pull_request.number }}/head:refs/remotes/origin/pr/${{ github.event.pull_request.number }}"
+
+      - name: Build Codex prompt
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .github/codex/prompts/pr-review.md codex-review-prompt.md
+          {
+            echo
+            echo "## Runtime PR Context"
+            echo
+            echo "- Repository: ${{ github.repository }}"
+            echo "- PR number: ${{ github.event.pull_request.number || 'manual' }}"
+            echo "- Base ref: ${{ github.event.pull_request.base.ref || github.ref_name }}"
+            echo "- Head ref: ${{ github.event.pull_request.head.ref || github.ref_name }}"
+            echo "- PR title: ${{ github.event.pull_request.title || 'Manual run' }}"
+            echo
+            echo "Review only the diff introduced by this pull request, but use the repository docs and specs as governing context."
+          } >> codex-review-prompt.md
+
+      - name: Run Codex review
+        id: codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: codex-review-prompt.md
+          output-schema-file: .github/codex/schemas/pr-review.schema.json
+          output-file: codex-review-output.json
+          model: gpt-5
+          sandbox: read-only
+          safety-strategy: read-only
+
+      - name: Post review comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          REVIEW_OUTPUT_PATH: codex-review-output.json
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- codex-ai-review -->';
+            const path = process.env.REVIEW_OUTPUT_PATH;
+            const data = JSON.parse(fs.readFileSync(path, 'utf8'));
+            const findings = Array.isArray(data.findings) ? data.findings : [];
+
+            const verdictLabel = {
+              approve: 'Approve',
+              comment: 'Comment',
+              request_changes: 'Request changes',
+            }[data.verdict] || 'Comment';
+
+            const findingsBlock = findings.length
+              ? findings.map((finding, index) => {
+                  const location = finding.line ? `${finding.file}:${finding.line}` : finding.file;
+                  return [
+                    `${index + 1}. [${finding.severity}] ${finding.title}`,
+                    `Location: ${location}`,
+                    finding.body,
+                  ].join('\n');
+                }).join('\n\n')
+              : 'No review findings.';
+
+            const body = [
+              marker,
+              '## Codex AI Review',
+              '',
+              `Verdict: **${verdictLabel}**`,
+              '',
+              '### Summary',
+              data.summary,
+              '',
+              '### Findings',
+              findingsBlock,
+            ].join('\n');
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            const existing = comments.find((comment) => comment.body && comment.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body,
+              });
+            }

@@ -18,6 +18,10 @@ Read these files before implementation:
 
 Then inspect only the relevant code.
 
+## Role
+
+Claude Code is the primary implementation agent for this repository.
+
 ## Implementation Rules
 
 - Respect the repository structure
@@ -26,6 +30,8 @@ Then inspect only the relevant code.
 - Preserve architectural decisions recorded in docs and specs
 - If implementation requires a scope change, update docs and spec artifacts first
 - Keep files focused and reasonably small
+- Open pull requests for code changes instead of merging directly to `main`
+- Expect Codex review plus required GitHub checks before merge
 
 ## Negative Rules
 
@@ -40,3 +46,4 @@ Then inspect only the relevant code.
 - Keep naming and file placement consistent
 - Leave concise comments only where intent is not obvious
 - Use pull requests as the unit of review
+- Treat `specs/<feature-id>/tasks.md` as the execution checklist and keep it current

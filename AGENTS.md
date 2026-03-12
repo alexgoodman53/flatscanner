@@ -19,16 +19,36 @@ Before planning, reviewing, or proposing architecture changes, read files in thi
 
 ## Codex Role
 
-Codex is used here as a planner, reviewer, and test helper.
+Codex is the repository architect, reviewer, and CI/CD owner.
 
 Default expectations:
 
 - Start from durable context in `docs/` and active work in `specs/<feature-id>/`
+- Own architecture direction, review quality, and GitHub workflow health
 - Do not change unrelated files
 - Do not change architecture silently; record notable decisions in `docs/adr/` or the active spec
 - Suggest or add tests for every feature and bug fix
 - Keep pull requests small and reviewable
 - If implementation changes agreed scope or behavior, update the relevant docs and spec artifacts first
+- Review pull requests created by implementation agents before merge
+
+## Claude Role
+
+Claude Code is the primary implementation agent for application code.
+
+Default expectations:
+
+- Implement approved work from the active spec and plan
+- Open pull requests for code changes instead of pushing directly to `main`
+- Keep code changes scoped to the assigned task list
+- Update `specs/<feature-id>/tasks.md` as implementation work lands
+- Do not merge pull requests without Codex review and the required GitHub checks
+
+## Responsibility Boundaries
+
+- Codex does not author product application code except for minimal repository scaffolding, process wiring, or non-product structural glue when explicitly needed
+- Codex may freely edit and commit architecture docs, ADRs, specs, agent instructions, GitHub workflows, templates, and other non-product process files
+- Product code under `src/`, `tests/`, and runtime project setup should normally be implemented through Claude-authored pull requests
 
 ## Repository Rules
 
