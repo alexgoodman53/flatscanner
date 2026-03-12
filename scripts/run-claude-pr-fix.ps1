@@ -76,7 +76,7 @@ $reviewCommentBlock
 "@
 Set-Content -Path $runtimePrompt -Value ($promptTemplate + $runtimeSection)
 
-$promptText = (Get-Content $runtimePrompt -Raw).Trim() + @"
+Add-Content -Path $runtimePrompt -Value @"
 
 Output only one minified JSON object with exactly three keys: summary, tests, follow_up.
 Do not include markdown, code fences, or prose before or after the JSON.
@@ -84,7 +84,7 @@ Set all three values as strings.
 "@
 
 Write-Host "Running Claude CLI for PR #$prNumber"
-& $claudePath -p $promptText --output-format text --permission-mode bypassPermissions --allowedTools Bash,Glob,Grep,Read,Edit,Write | Tee-Object -FilePath ($outputPath + '.stdout') | Out-Null
+Get-Content $runtimePrompt -Raw | & $claudePath -p - --output-format text --permission-mode bypassPermissions --allowedTools Bash,Glob,Grep,Read,Edit,Write | Tee-Object -FilePath ($outputPath + '.stdout') | Out-Null
 
 $resultText = (Get-Content ($outputPath + '.stdout') -Raw).Trim()
 if (-not $resultText) {
