@@ -76,23 +76,27 @@ $reviewCommentBlock
 "@
 Set-Content -Path $runtimePrompt -Value ($promptTemplate + $runtimeSection)
 
-$schema = '{"type":"object","additionalProperties":false,"required":["summary","tests","follow_up"],"properties":{"summary":{"type":"string"},"tests":{"type":"string"},"follow_up":{"type":"string"}}}'
+$promptText = (Get-Content $runtimePrompt -Raw).Trim() + @"
+
+Output only one minified JSON object with exactly three keys: summary, tests, follow_up.
+Do not include markdown, code fences, or prose before or after the JSON.
+Set all three values as strings.
+"@
 
 Write-Host "Running Claude CLI for PR #$prNumber"
-Get-Content $runtimePrompt -Raw | & $claudePath -p --output-format json --json-schema $schema --permission-mode bypassPermissions --allowedTools Bash,Glob,Grep,Read,Edit,Write --verbose | Tee-Object -FilePath ($outputPath + '.stdout') | Out-Null
+& $claudePath -p $promptText --output-format text --permission-mode bypassPermissions --allowedTools Bash,Glob,Grep,Read,Edit,Write | Tee-Object -FilePath ($outputPath + '.stdout') | Out-Null
 
-$jsonLine = Select-String -Path ($outputPath + '.stdout') -Pattern '"type":"result"' | Select-Object -Last 1
-if (-not $jsonLine) {
-    throw 'Claude CLI did not emit a result payload.'
-}
-
-$resultEnvelope = $jsonLine.Line | ConvertFrom-Json
-$resultText = [string]$resultEnvelope.result
+$resultText = (Get-Content ($outputPath + '.stdout') -Raw).Trim()
 if (-not $resultText) {
-    throw 'Claude CLI result payload was empty.'
+    throw 'Claude CLI output was empty.'
 }
 
-$result = $resultText | ConvertFrom-Json
+try {
+    $result = $resultText | ConvertFrom-Json
+}
+catch {
+    throw "Claude CLI output was not valid JSON: $resultText"
+}
 
 git config user.name 'Claude Code'
 git config user.email 'claude-code@users.noreply.github.com'
