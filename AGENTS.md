@@ -31,6 +31,7 @@ Default expectations:
 - Keep pull requests small and reviewable
 - If implementation changes agreed scope or behavior, update the relevant docs and spec artifacts first
 - Review pull requests created by implementation agents before merge
+- Operate automated PR review through the repository self-hosted runner configuration
 
 ## Claude Role
 

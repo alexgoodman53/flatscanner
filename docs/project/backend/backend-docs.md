@@ -52,6 +52,12 @@ Initial backend direction is chosen and should be treated as the current default
 - Keep cost controls visible because Apify, Google, and OpenRouter usage can scale quickly
 - Record notable architecture changes in `docs/adr/`
 
+## Delivery Infrastructure
+
+- Automated PR review runs on a Windows self-hosted GitHub runner labeled `codex`
+- The runner invokes a local Codex adapter script so review can use the machine-local Codex setup
+- Setup instructions live in `docs/project/backend/self-hosted-runner.md`
+
 ## What Belongs Here
 
 Record stable backend decisions when they are made:
