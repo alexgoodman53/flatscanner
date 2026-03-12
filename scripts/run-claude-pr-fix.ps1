@@ -79,9 +79,9 @@ Set-Content -Path $runtimePrompt -Value ($promptTemplate + $runtimeSection)
 $schema = '{"type":"object","additionalProperties":false,"required":["summary","tests","follow_up"],"properties":{"summary":{"type":"string"},"tests":{"type":"string"},"follow_up":{"type":"string"}}}'
 
 Write-Host "Running Claude CLI for PR #$prNumber"
-Get-Content $runtimePrompt -Raw | & $claudePath -p --output-format json --json-schema $schema --permission-mode bypassPermissions --allowedTools Bash,Glob,Grep,Read,Edit,Write --verbose | Tee-Object -FilePath $outputPath.stdout | Out-Null
+Get-Content $runtimePrompt -Raw | & $claudePath -p --output-format json --json-schema $schema --permission-mode bypassPermissions --allowedTools Bash,Glob,Grep,Read,Edit,Write --verbose | Tee-Object -FilePath ($outputPath + '.stdout') | Out-Null
 
-$jsonLine = Select-String -Path $outputPath.stdout -Pattern '"type":"result"' | Select-Object -Last 1
+$jsonLine = Select-String -Path ($outputPath + '.stdout') -Pattern '"type":"result"' | Select-Object -Last 1
 if (-not $jsonLine) {
     throw 'Claude CLI did not emit a result payload.'
 }
@@ -144,3 +144,4 @@ if ($env:TRIGGER_LABEL -eq 'claude-fix') {
         Write-Warning 'Unable to remove claude-fix label after run.'
     }
 }
+
