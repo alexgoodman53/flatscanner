@@ -1,0 +1,78 @@
+"""Tests for FastAPI application bootstrap and configuration."""
+
+import pytest
+from fastapi.testclient import TestClient
+
+from src.app.config import Settings
+from src.app.main import create_app
+
+
+def _test_settings(**overrides) -> Settings:
+    """Return a Settings instance with safe test defaults."""
+    defaults = {
+        "app_env": "testing",
+        "telegram_bot_token": "test-token",
+        "openrouter_api_key": "test-key",
+        "apify_api_token": "test-apify",
+        "database_url": "postgresql+asyncpg://test:test@localhost:5432/test",
+        "redis_url": "redis://localhost:6379/1",
+    }
+    defaults.update(overrides)
+    return Settings(**defaults)
+
+
+class TestSettings:
+    def test_defaults(self):
+        s = Settings()
+        assert s.app_env == "development"
+        assert s.debug is False
+        assert s.openrouter_model == "anthropic/claude-3-haiku"
+        assert s.database_url.startswith("postgresql")
+        assert s.redis_url.startswith("redis://")
+
+    def test_override_via_kwargs(self):
+        s = Settings(app_env="production", debug=True)
+        assert s.app_env == "production"
+        assert s.debug is True
+
+    def test_env_fields_present(self):
+        """Confirm all expected integration env vars are declared."""
+        s = Settings()
+        assert hasattr(s, "telegram_bot_token")
+        assert hasattr(s, "openrouter_api_key")
+        assert hasattr(s, "apify_api_token")
+
+
+class TestCreateApp:
+    def test_returns_fastapi_instance(self):
+        from fastapi import FastAPI
+
+        app = create_app(settings=_test_settings())
+        assert isinstance(app, FastAPI)
+
+    def test_settings_attached_to_state(self):
+        settings = _test_settings(app_env="testing")
+        app = create_app(settings=settings)
+        assert app.state.settings is settings
+
+    def test_debug_propagated(self):
+        app = create_app(settings=_test_settings(debug=True))
+        assert app.debug is True
+
+    def test_app_title(self):
+        app = create_app(settings=_test_settings())
+        assert app.title == "flatscanner"
+
+
+class TestHealthEndpoint:
+    def test_health_returns_200(self):
+        app = create_app(settings=_test_settings())
+        with TestClient(app) as client:
+            response = client.get("/health")
+        assert response.status_code == 200
+
+    def test_health_response_body(self):
+        app = create_app(settings=_test_settings())
+        with TestClient(app) as client:
+            response = client.get("/health")
+        assert response.json() == {"status": "ok"}
