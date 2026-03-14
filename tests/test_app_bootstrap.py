@@ -81,6 +81,25 @@ class TestCreateApp:
         assert app.title == "flatscanner"
 
 
+class TestCreateAppFreshSettings:
+    def test_create_app_reads_env_without_explicit_settings(self, monkeypatch):
+        """create_app() must read current env vars, not a cached Settings instance."""
+        monkeypatch.setenv("DEBUG", "true")
+        monkeypatch.setenv("APP_ENV", "testing")
+        app = create_app()
+        assert app.debug is True
+        assert app.state.settings.app_env == "testing"
+
+    def test_create_app_produces_independent_instances(self, monkeypatch):
+        """Two create_app() calls with different env vars must yield independent apps."""
+        monkeypatch.setenv("APP_ENV", "first")
+        app1 = create_app()
+        monkeypatch.setenv("APP_ENV", "second")
+        app2 = create_app()
+        assert app1.state.settings.app_env == "first"
+        assert app2.state.settings.app_env == "second"
+
+
 class TestHealthEndpoint:
     def test_health_returns_200(self):
         app = create_app(settings=_test_settings())

@@ -3,7 +3,7 @@ from typing import AsyncIterator
 
 from fastapi import FastAPI
 
-from src.app.config import Settings, get_settings
+from src.app.config import Settings
 
 
 @asynccontextmanager
@@ -15,7 +15,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     if settings is None:
-        settings = get_settings()
+        settings = Settings()
 
     app = FastAPI(
         title="flatscanner",

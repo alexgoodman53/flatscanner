@@ -16,6 +16,8 @@
 
 - [x] Scaffold the Python backend structure under `src/`
 - [x] Add FastAPI application bootstrap and configuration handling
+  - [x] Add Python CI step (install + pytest) to enforce the new tests in CI
+  - [x] Fix `create_app()` to instantiate fresh `Settings()` on each call instead of relying on the cached `get_settings()`
 - [ ] Add Telegram bot entrypoints and message routing
 - [ ] Define normalized listing schemas and persistence models
 - [ ] Add provider detection and the Airbnb adapter interface
