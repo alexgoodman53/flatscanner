@@ -190,6 +190,7 @@ $diffBlock
         throw 'Claude review output is missing required fields.'
     }
 
+    # Keep the Claude adapter aligned with the shared review schema contract.
     if (@('approve', 'comment', 'request_changes') -notcontains [string]$result.verdict) {
         throw "Claude review output contains an invalid verdict: $($result.verdict)"
     }
@@ -200,7 +201,7 @@ $diffBlock
     }
 
     foreach ($finding in $findings) {
-        if (-not $finding.severity -or -not $finding.file -or -not $finding.title -or -not $finding.body) {
+        if (-not $finding.severity -or -not $finding.file -or $null -eq $finding.line -or -not $finding.title -or -not $finding.body) {
             throw 'Claude review output contains a finding with missing required fields.'
         }
         if ($null -ne $finding.line -and ($finding.line -as [int]) -lt 1) {

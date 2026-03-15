@@ -184,7 +184,7 @@ You may inspect repository files and run read-only git commands if needed.
         $findingsBlock = 'No review findings.'
     }
 
-$body = @"
+    $body = @"
 $marker
 ## AI Review
 

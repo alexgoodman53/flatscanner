@@ -45,7 +45,11 @@ This repository expects automated PR review to run on a Windows self-hosted GitH
 
 ## Required GitHub Branch Protection
 
-- If this repository is upgrading from the earlier `codex-review` job name, update the required status check to `AI Review`
+- Migration note:
+  If this repository is upgrading from the earlier `codex-review` job name, update the required status check to `AI Review` before merging the workflow change.
+- Example:
+  `gh api --method PATCH repos/alexgoodman53/flatscanner/branches/main/protection/required_status_checks --input -`
+  with body `{"strict":true,"contexts":["baseline-checks","guard","AI Review"]}`
 - Protect `main`
 - Require pull requests before merge
 - Require status checks `CI`, `PR Guard`, and `AI Review`
