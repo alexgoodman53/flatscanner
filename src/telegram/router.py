@@ -51,4 +51,5 @@ async def webhook(request: Request, update: TelegramUpdate) -> dict:
         await send_message(settings.telegram_bot_token, decision["chat_id"], text)
     except Exception:
         logger.exception("send_message failed for chat_id=%s", decision["chat_id"])
+        raise HTTPException(status_code=502, detail="Failed to deliver reply to Telegram")
     return {"ok": True}

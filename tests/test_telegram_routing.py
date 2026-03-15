@@ -223,14 +223,13 @@ class TestWebhookEndpoint:
         assert url_with_params in call_args[2]
 
     @patch("src.telegram.router.send_message", new_callable=AsyncMock)
-    def test_webhook_returns_ok_when_send_message_raises(self, mock_send):
-        """A failed outbound send must not cause the webhook to return non-2xx."""
+    def test_webhook_returns_non_2xx_when_send_message_raises(self, mock_send):
+        """A failed outbound send must cause the webhook to return non-2xx so Telegram retries."""
         mock_send.side_effect = Exception("network failure")
         client = self._client()
         payload = self._update_payload("https://airbnb.com/rooms/1")
         response = client.post("/telegram/webhook", json=payload)
-        assert response.status_code == 200
-        assert response.json() == {"ok": True}
+        assert response.status_code >= 400
 
 
 # ---------------------------------------------------------------------------
