@@ -25,12 +25,18 @@ class Settings(BaseSettings):
     telegram_webhook_secret: str = ""
 
     @model_validator(mode="after")
-    def _require_webhook_secret_outside_dev(self) -> "Settings":
-        if self.app_env not in _DEV_ENVS and not self.telegram_webhook_secret:
-            raise ValueError(
-                "telegram_webhook_secret must be set when app_env is not "
-                "'development' or 'testing'"
-            )
+    def _require_telegram_fields_outside_dev(self) -> "Settings":
+        if self.app_env not in _DEV_ENVS:
+            if not self.telegram_webhook_secret:
+                raise ValueError(
+                    "telegram_webhook_secret must be set when app_env is not "
+                    "'development' or 'testing'"
+                )
+            if not self.telegram_bot_token:
+                raise ValueError(
+                    "telegram_bot_token must be set when app_env is not "
+                    "'development' or 'testing'"
+                )
         return self
 
     # Database – asyncpg driver will be added when storage layer lands

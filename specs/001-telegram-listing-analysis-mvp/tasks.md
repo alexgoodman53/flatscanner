@@ -23,6 +23,7 @@
   - [x] Raise on non-2xx Telegram API responses in send_message (PR-5-fix-2)
   - [x] Require telegram_webhook_secret outside development/testing environments (PR-5-fix-3)
   - [x] Fix stale HTML parse mode claim in sender.py docstring (PR-5-fix-3)
+  - [x] Require telegram_bot_token outside development/testing environments (PR-5-fix-4)
 - [ ] Define normalized listing schemas and persistence models
 - [ ] Add provider detection and the Airbnb adapter interface
 - [ ] Integrate Apify-backed Airbnb extraction
