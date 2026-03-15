@@ -16,6 +16,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     DateTime,
     Float,
@@ -25,6 +26,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     Uuid,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -46,6 +48,9 @@ class ListingRow(Base):
     """
 
     __tablename__ = "listings"
+    __table_args__ = (
+        UniqueConstraint("provider", "source_id", name="uq_listings_provider_source_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     provider: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -115,8 +120,8 @@ class AnalysisJobRow(Base):
         nullable=True,
     )
 
-    telegram_chat_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    telegram_message_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    telegram_chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    telegram_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
 
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 

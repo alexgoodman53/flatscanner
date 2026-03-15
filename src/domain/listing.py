@@ -11,7 +11,6 @@ import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
-from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -77,8 +76,8 @@ class NormalizedListing(BaseModel):
     """Provider-agnostic representation of a rental listing.
 
     Produced by the adapter layer after mapping a raw provider payload.
-    The ``raw_payload`` field preserves the original source data for
-    debugging and future re-processing needs.
+    Raw provider payloads are stored separately in the persistence layer;
+    this model contains only normalized, provider-agnostic fields.
     """
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4)
@@ -103,9 +102,6 @@ class NormalizedListing(BaseModel):
 
     host_name: str | None = None
     host_is_superhost: bool | None = None
-
-    # Original provider payload stored for traceability
-    raw_payload: dict[str, Any] | None = None
 
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)

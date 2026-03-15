@@ -157,7 +157,6 @@ class TestNormalizedListing:
         assert listing.review_count is None
         assert listing.host_name is None
         assert listing.host_is_superhost is None
-        assert listing.raw_payload is None
 
     def test_location_defaults_to_empty_location(self):
         listing = self._minimal()
@@ -186,12 +185,15 @@ class TestNormalizedListing:
             review_count=120,
             host_name="Jane",
             host_is_superhost=True,
-            raw_payload={"original": True},
         )
         assert listing.location.city == "London"
         assert listing.amenities == ["WiFi", "Pool"]
         assert listing.host_is_superhost is True
-        assert listing.raw_payload == {"original": True}
+
+    def test_no_raw_payload_field(self):
+        """NormalizedListing must remain provider-agnostic; raw_payload lives in persistence only."""
+        listing = self._minimal()
+        assert not hasattr(listing, "raw_payload")
 
 
 # ---------------------------------------------------------------------------
@@ -242,3 +244,9 @@ class TestAnalysisJob:
         job = self._make(telegram_chat_id=5001, telegram_message_id=77)
         assert job.telegram_chat_id == 5001
         assert job.telegram_message_id == 77
+
+    def test_large_negative_chat_id(self):
+        """Supergroup/channel chat IDs are 64-bit signed values; ensure no overflow."""
+        large_id = -1001234567890
+        job = self._make(telegram_chat_id=large_id)
+        assert job.telegram_chat_id == large_id

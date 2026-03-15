@@ -118,3 +118,26 @@ class TestAnalysisJobRowColumns:
         col = _col(self._table, "status")
         assert col.default is not None
         assert col.default.arg == "pending"
+
+    def test_telegram_ids_use_biginteger(self):
+        """Telegram supergroup/channel IDs are 64-bit; must not use 32-bit Integer."""
+        assert issubclass(type(_col(self._table, "telegram_chat_id").type), sa.BigInteger)
+        assert issubclass(type(_col(self._table, "telegram_message_id").type), sa.BigInteger)
+
+
+# ---------------------------------------------------------------------------
+# ListingRow uniqueness constraint
+# ---------------------------------------------------------------------------
+
+
+class TestListingRowConstraints:
+    _table: sa.Table = ListingRow.__table__  # type: ignore[attr-defined]
+
+    def test_provider_source_id_unique_constraint_exists(self):
+        """get_by_source() assumes at most one row per (provider, source_id)."""
+        matching = [
+            c for c in self._table.constraints
+            if isinstance(c, sa.UniqueConstraint)
+            and {col.name for col in c.columns} == {"provider", "source_id"}
+        ]
+        assert matching, "Missing UniqueConstraint on (provider, source_id) in listings table"
