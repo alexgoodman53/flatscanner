@@ -17,6 +17,9 @@ class Settings(BaseSettings):
 
     # Telegram
     telegram_bot_token: str = ""
+    # Optional shared secret for webhook authentication (X-Telegram-Bot-Api-Secret-Token).
+    # Leave empty to disable the check (useful in local dev without a real webhook).
+    telegram_webhook_secret: str = ""
 
     # Database – asyncpg driver will be added when storage layer lands
     database_url: str = (

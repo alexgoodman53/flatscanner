@@ -1,7 +1,8 @@
 """Tests for Telegram bot entrypoints and message routing."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -9,6 +10,7 @@ from src.app.config import Settings
 from src.app.main import create_app
 from src.telegram.dispatcher import extract_url, route_update
 from src.telegram.models import TelegramChat, TelegramMessage, TelegramUpdate, TelegramUser
+from src.telegram.sender import send_message
 
 
 # ---------------------------------------------------------------------------
@@ -229,3 +231,90 @@ class TestWebhookEndpoint:
         response = client.post("/telegram/webhook", json=payload)
         assert response.status_code == 200
         assert response.json() == {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Webhook authentication
+# ---------------------------------------------------------------------------
+
+
+class TestWebhookAuthentication:
+    def _client(self, **settings_overrides) -> TestClient:
+        return TestClient(create_app(settings=_test_settings(**settings_overrides)))
+
+    def _update_payload(self) -> dict:
+        return {
+            "update_id": 1,
+            "message": {
+                "message_id": 1,
+                "from": {"id": 42, "first_name": "Alice"},
+                "chat": {"id": 1001, "type": "private"},
+                "text": "https://airbnb.com/rooms/1",
+            },
+        }
+
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_no_secret_configured_accepts_request_without_header(self, mock_send):
+        """When no webhook secret is configured any request is accepted."""
+        client = self._client()  # telegram_webhook_secret defaults to ""
+        response = client.post("/telegram/webhook", json=self._update_payload())
+        assert response.status_code == 200
+
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_correct_secret_header_accepted(self, mock_send):
+        client = self._client(telegram_webhook_secret="correct-secret")
+        response = client.post(
+            "/telegram/webhook",
+            json=self._update_payload(),
+            headers={"X-Telegram-Bot-Api-Secret-Token": "correct-secret"},
+        )
+        assert response.status_code == 200
+        assert response.json() == {"ok": True}
+
+    def test_missing_secret_header_rejected(self):
+        client = self._client(telegram_webhook_secret="correct-secret")
+        response = client.post("/telegram/webhook", json=self._update_payload())
+        assert response.status_code == 403
+
+    def test_wrong_secret_header_rejected(self):
+        client = self._client(telegram_webhook_secret="correct-secret")
+        response = client.post(
+            "/telegram/webhook",
+            json=self._update_payload(),
+            headers={"X-Telegram-Bot-Api-Secret-Token": "wrong-secret"},
+        )
+        assert response.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# send_message non-2xx behaviour
+# ---------------------------------------------------------------------------
+
+
+class TestSendMessage:
+    @pytest.mark.asyncio
+    async def test_raises_on_non_2xx_response(self):
+        """send_message must propagate an HTTPStatusError on non-2xx Telegram responses."""
+        mock_response = MagicMock()
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "400 Bad Request",
+            request=httpx.Request("POST", "https://api.telegram.org/bottoken/sendMessage"),
+            response=httpx.Response(400),
+        )
+        mock_client = AsyncMock()
+        mock_client.post.return_value = mock_response
+
+        with pytest.raises(httpx.HTTPStatusError):
+            await send_message("token", 123, "hello", client=mock_client)
+
+    @pytest.mark.asyncio
+    async def test_does_not_raise_on_2xx_response(self):
+        """send_message must not raise when the Telegram API returns 2xx."""
+        mock_response = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_client = AsyncMock()
+        mock_client.post.return_value = mock_response
+
+        # Should complete without raising
+        await send_message("token", 123, "hello", client=mock_client)
+        mock_client.post.assert_awaited_once()

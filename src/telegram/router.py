@@ -2,7 +2,7 @@
 
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 
 from src.telegram.dispatcher import route_update
 from src.telegram.models import TelegramUpdate
@@ -25,8 +25,18 @@ async def webhook(request: Request, update: TelegramUpdate) -> dict:
     """Receive a Telegram update and route it to the appropriate handler.
 
     Returns ``{"ok": true}`` in all cases so Telegram stops retrying.
+
+    If ``Settings.telegram_webhook_secret`` is set the request must carry a
+    matching ``X-Telegram-Bot-Api-Secret-Token`` header; otherwise 403 is
+    returned before the update is processed.
     """
     settings = request.app.state.settings
+
+    if settings.telegram_webhook_secret:
+        incoming_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+        if incoming_secret != settings.telegram_webhook_secret:
+            raise HTTPException(status_code=403, detail="Forbidden")
+
     decision = route_update(update)
 
     if decision["action"] == "ignore":

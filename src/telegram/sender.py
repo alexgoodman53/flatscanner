@@ -28,7 +28,9 @@ async def send_message(
     payload = {"chat_id": chat_id, "text": text}
 
     if client is not None:
-        await client.post(url, json=payload)
+        response = await client.post(url, json=payload)
+        response.raise_for_status()
     else:
         async with httpx.AsyncClient() as c:
-            await c.post(url, json=payload)
+            response = await c.post(url, json=payload)
+            response.raise_for_status()
