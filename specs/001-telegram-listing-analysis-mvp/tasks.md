@@ -36,6 +36,7 @@
   - [x] Require a real listing ID after /rooms/ (bare /rooms/ path rejected); require non-empty path for abnb.me shortlinks (PR-5-fix-10)
   - [x] Route messages with Airbnb URLs in media captions the same as text messages (PR-5-fix-10)
   - [x] Anchor /rooms/<id> path matcher to reject extra segments like /rooms/123/photos (PR-5-fix-12)
+  - [x] Replace broad localized-Airbnb regex with explicit supported-domain TLD allowlist; reject non-http/https schemes inside is_supported_provider() (PR-5-fix-13)
 - [ ] Define normalized listing schemas and persistence models
 - [ ] Add provider detection and the Airbnb adapter interface
 - [ ] Integrate Apify-backed Airbnb extraction
@@ -51,6 +52,7 @@
 - [x] Add tests for malformed /rooms/ and abnb.me URLs, and caption-based routing (PR-5-fix-10)
 - [x] Add test for 429 Too Many Requests treated as transient retry (PR-5-fix-11)
 - [x] Add regression test that /rooms/123/photos extra-segment URLs are rejected (PR-5-fix-12)
+- [x] Add negative tests for bogus ccTLD hosts and non-web schemes (PR-5-fix-13)
 - [ ] Add tests for normalized listing mapping
 - [ ] Add tests for Telegram output formatting
 - [ ] Add orchestration tests for partial enrichment scenarios

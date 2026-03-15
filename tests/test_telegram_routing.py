@@ -206,6 +206,34 @@ class TestIsSupportedProvider:
         # /rooms/123/photos is not a canonical listing URL — extra segments must be rejected
         assert is_supported_provider("https://www.airbnb.com/rooms/123/photos") is False
 
+    # --- Bogus ccTLD hosts not in the allowlist ---
+
+    def test_airbnb_unlisted_cctld_is_not_supported(self):
+        # airbnb.xyz is not in the supported TLD allowlist
+        assert is_supported_provider("https://airbnb.xyz/rooms/123") is False
+
+    def test_airbnb_unlisted_compound_cctld_is_not_supported(self):
+        # airbnb.co.xx is not a real Airbnb market and must not match
+        assert is_supported_provider("https://airbnb.co.xx/rooms/123") is False
+
+    def test_airbnb_unlisted_cctld_www_is_not_supported(self):
+        # www.airbnb.notreal is not in the allowlist
+        assert is_supported_provider("https://www.airbnb.notreal/rooms/123") is False
+
+    # --- Non-http/https schemes ---
+
+    def test_ftp_scheme_is_not_supported(self):
+        # ftp:// must be rejected regardless of host
+        assert is_supported_provider("ftp://airbnb.com/rooms/123") is False
+
+    def test_javascript_scheme_is_not_supported(self):
+        # javascript: URIs must never be accepted
+        assert is_supported_provider("javascript://airbnb.com/rooms/123") is False
+
+    def test_file_scheme_is_not_supported(self):
+        # file:// URIs must be rejected
+        assert is_supported_provider("file:///airbnb.com/rooms/123") is False
+
 
 # ---------------------------------------------------------------------------
 # route_update
