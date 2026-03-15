@@ -36,6 +36,7 @@ Default expectations:
 - Stay with an orchestrated implementation loop until the resulting pull request is either merge-ready or explicitly paused by the user
 - Treat CI/CD, review automation, and workflow-health fixes as part of the same task when they block merge readiness
 - Never treat "checks queued", "checks in progress", "last fix pushed", or "only workflow issues remain" as a valid completion point
+- Start every new task from the current `main` branch state before creating a new task branch or worker worktree
 
 ## Claude Role
 
@@ -66,6 +67,7 @@ Default expectations:
 - Keep workflows in `.github/workflows/` green
 - Use `src/` for app code, `tests/` for automated tests, `scripts/` for project utilities
 - Keep one branch and one pull request per Claude worker task
+- Branch new work from current `main`; do not begin a fresh task from an older feature or process branch
 
 ## Negative Rules
 

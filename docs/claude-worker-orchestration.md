@@ -20,6 +20,7 @@ The model is intentionally simple:
 - Prefer one worker by default
 - Only use parallel workers for independent tasks
 - Keep the soft concurrency limit at three workers on one machine
+- Before launching any new worker, sync the main checkout to the current `origin/main` and branch from that state
 
 ## Recommended Split
 
@@ -39,13 +40,14 @@ Bad candidates for parallel workers:
 
 ## Standard Flow
 
-1. Codex identifies the active feature folder and the exact task
-2. Codex creates an isolated worktree with `scripts/new-claude-worktree.ps1`
-3. Codex starts Claude in that worktree with `scripts/start-claude-worker.ps1`
-4. Claude implements the task and may call `scripts/publish-claude-branch.ps1`
-5. GitHub runs `baseline-checks`, `guard`, and `codex-review`
-6. If needed, Codex triggers follow-up fixes through the existing `claude-fix` PR workflow
-7. Codex keeps following that same PR until it is merge-ready or the user explicitly pauses the loop
+1. Codex syncs the main checkout to the latest `origin/main`
+2. Codex identifies the active feature folder and the exact task
+3. Codex creates an isolated worktree with `scripts/new-claude-worktree.ps1`
+4. Codex starts Claude in that worktree with `scripts/start-claude-worker.ps1`
+5. Claude implements the task and may call `scripts/publish-claude-branch.ps1`
+6. GitHub runs `baseline-checks`, `guard`, and `codex-review`
+7. If needed, Codex triggers follow-up fixes through the existing `claude-fix` PR workflow
+8. Codex keeps following that same PR until it is merge-ready or the user explicitly pauses the loop
 
 The loop is still active while any of these are true:
 

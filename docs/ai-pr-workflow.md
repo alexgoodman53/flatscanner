@@ -13,17 +13,18 @@ Codex may also launch Claude workers locally through CLI, but those workers stil
 
 ## Standard Delivery Loop
 
-1. Select the active feature folder under `specs/<feature-id>/`
-2. Either start Claude manually or have Codex launch a local Claude worker in an isolated worktree
-3. Claude implements the scoped task in a feature branch
-4. Claude updates `tasks.md` and any required `docs/` or spec files in the same PR
-5. Claude opens a pull request using the repository template
-6. GitHub Actions runs `baseline-checks`, `guard`, and `codex-review`
-7. Codex posts or updates a sticky AI review comment in the pull request
-8. If fixes are needed, trigger Claude on the same PR by either adding the `claude-fix` label or commenting `/claude-fix`
-9. Claude reads the review findings, updates the same branch, and pushes follow-up commits
-10. GitHub reruns the checks automatically on the updated branch
-11. A human merges only after required checks are green and the PR is approved
+1. Sync the working checkout to the current `main` branch state
+2. Select the active feature folder under `specs/<feature-id>/`
+3. Either start Claude manually or have Codex launch a local Claude worker in an isolated worktree
+4. Claude implements the scoped task in a feature branch created from current `main`
+5. Claude updates `tasks.md` and any required `docs/` or spec files in the same PR
+6. Claude opens a pull request using the repository template
+7. GitHub Actions runs `baseline-checks`, `guard`, and `codex-review`
+8. Codex posts or updates a sticky AI review comment in the pull request
+9. If fixes are needed, trigger Claude on the same PR by either adding the `claude-fix` label or commenting `/claude-fix`
+10. Claude reads the review findings, updates the same branch, and pushes follow-up commits
+11. GitHub reruns the checks automatically on the updated branch
+12. A human merges only after required checks are green and the PR is approved
 
 ## Stop Condition
 
