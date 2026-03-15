@@ -151,3 +151,4 @@ if ($result.verdict -eq 'request_changes') {
 }
 
 $global:LASTEXITCODE = 0
+exit 0
