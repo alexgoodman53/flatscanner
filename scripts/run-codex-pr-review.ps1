@@ -51,6 +51,7 @@ try {
     $githubToken = $env:GITHUB_TOKEN
     $repository = $env:GITHUB_REPOSITORY
     $marker = '<!-- ai-review -->'
+    $legacyMarker = '<!-- codex-ai-review -->'
     $agentLabel = 'Codex'
 
     if (-not $eventPath -or -not (Test-Path $eventPath)) {
@@ -200,7 +201,7 @@ $findingsBlock
 
     $commentsUrl = "https://api.github.com/repos/$repository/issues/$prNumber/comments"
     $comments = Invoke-RestMethod -Headers $headers -Uri $commentsUrl -Method Get
-    $existing = $comments | Where-Object { $_.body -like "*$marker*" } | Select-Object -First 1
+    $existing = $comments | Where-Object { $_.body -like "*$marker*" -or $_.body -like "*$legacyMarker*" } | Select-Object -First 1
     $payload = @{ body = $body } | ConvertTo-Json
 
     if ($existing) {

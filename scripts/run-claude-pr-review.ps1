@@ -162,7 +162,9 @@ $diffBlock
     $promptText = (Get-Content $runtimePrompt -Raw).Trim()
 
     Write-Diagnostic 'Running local Claude CLI review'
-    $resultText = $promptText | & $claudePath -p --output-format text --permission-mode default --tools '""'
+    # Claude CLI expects the literal string '""' to disable tools in print mode on Windows.
+    $noTools = '""'
+    $resultText = $promptText | & $claudePath -p --output-format text --permission-mode default --tools $noTools
     $claudeExitCode = $LASTEXITCODE
     Write-Diagnostic "claude review completed with exit code $claudeExitCode"
 
@@ -212,7 +214,8 @@ $diffBlock
         if (-not $finding.severity -or -not $finding.file -or $null -eq $finding.line -or -not $finding.title -or -not $finding.body) {
             throw 'Claude review output contains a finding with missing required fields.'
         }
-        if ($null -ne $finding.line -and ($finding.line -as [int]) -lt 1) {
+        $lineNumber = $finding.line -as [int]
+        if ($null -ne $lineNumber -and $lineNumber -lt 1) {
             throw 'Claude review output contains a finding with an invalid line number.'
         }
     }

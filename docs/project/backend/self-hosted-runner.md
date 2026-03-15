@@ -50,6 +50,8 @@ This repository expects automated PR review to run on a Windows self-hosted GitH
 - Example:
   `gh api --method PATCH repos/alexgoodman53/flatscanner/branches/main/protection/required_status_checks --input -`
   with body `{"strict":true,"contexts":["baseline-checks","guard","AI Review"]}`
+- Repository helper:
+  `powershell -ExecutionPolicy Bypass -File .\scripts\set-required-ai-review-check.ps1`
 - Protect `main`
 - Require pull requests before merge
 - Require status checks `CI`, `PR Guard`, and `AI Review`
