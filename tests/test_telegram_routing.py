@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from src.app.config import Settings
 from src.app.main import create_app
-from src.telegram.dispatcher import extract_url, is_supported_provider, route_update
+from src.telegram.dispatcher import extract_url, extract_urls, is_supported_provider, route_update
 from src.telegram.models import TelegramChat, TelegramMessage, TelegramUpdate, TelegramUser
 from src.telegram.sender import send_message
 
@@ -77,6 +77,31 @@ class TestExtractUrl:
 
 
 # ---------------------------------------------------------------------------
+# extract_urls
+# ---------------------------------------------------------------------------
+
+
+class TestExtractUrls:
+    def test_returns_empty_list_when_no_url(self):
+        assert extract_urls("Hello, how are you?") == []
+
+    def test_returns_single_url(self):
+        assert extract_urls("See https://airbnb.com/rooms/1") == ["https://airbnb.com/rooms/1"]
+
+    def test_returns_all_urls(self):
+        text = "https://booking.com/hotel/x and https://airbnb.com/rooms/1"
+        assert extract_urls(text) == ["https://booking.com/hotel/x", "https://airbnb.com/rooms/1"]
+
+    def test_strips_trailing_punctuation_from_each_url(self):
+        text = "Check https://airbnb.com/rooms/1. Also https://example.com/flat,"
+        result = extract_urls(text)
+        assert result == ["https://airbnb.com/rooms/1", "https://example.com/flat"]
+
+    def test_empty_string_returns_empty_list(self):
+        assert extract_urls("") == []
+
+
+# ---------------------------------------------------------------------------
 # is_supported_provider
 # ---------------------------------------------------------------------------
 
@@ -109,6 +134,19 @@ class TestIsSupportedProvider:
 
     def test_abnb_me_look_alike_is_not_supported(self):
         assert is_supported_provider("https://notabnb.me/abc123") is False
+
+    def test_airbnb_help_page_is_not_supported(self):
+        # Non-listing Airbnb pages must not trigger an analysis job
+        assert is_supported_provider("https://www.airbnb.com/help/article/2701") is False
+
+    def test_airbnb_search_url_is_not_supported(self):
+        assert is_supported_provider("https://www.airbnb.com/s/Paris--France") is False
+
+    def test_airbnb_home_page_is_not_supported(self):
+        assert is_supported_provider("https://www.airbnb.com/") is False
+
+    def test_airbnb_listing_rooms_path_is_supported(self):
+        assert is_supported_provider("https://www.airbnb.com/rooms/12345678") is True
 
 
 # ---------------------------------------------------------------------------
@@ -165,6 +203,27 @@ class TestRouteUpdate:
         update = _make_update(text="")
         decision = route_update(update)
         assert decision["action"] == "ignore"
+
+    def test_analyse_when_supported_url_follows_unsupported(self):
+        """Router must find the supported URL even when it is not the first URL."""
+        update = _make_update(
+            "try https://www.booking.com/hotel/xyz or https://www.airbnb.com/rooms/123",
+            chat_id=5,
+        )
+        decision = route_update(update)
+        assert decision["action"] == "analyse"
+        assert decision["url"] == "https://www.airbnb.com/rooms/123"
+        assert decision["chat_id"] == 5
+
+    def test_unsupported_when_all_urls_are_unsupported(self):
+        """When multiple URLs are present but none is supported, report the first."""
+        update = _make_update(
+            "https://www.booking.com/hotel/abc or https://example.com/flat",
+            chat_id=9,
+        )
+        decision = route_update(update)
+        assert decision["action"] == "unsupported"
+        assert decision["url"] == "https://www.booking.com/hotel/abc"
 
 
 # ---------------------------------------------------------------------------
@@ -349,6 +408,16 @@ class TestWebhookAuthentication:
         response = client.post(
             "/telegram/webhook",
             json=self._update_payload(),
+            headers={"X-Telegram-Bot-Api-Secret-Token": "wrong-secret"},
+        )
+        assert response.status_code == 403
+
+    def test_invalid_body_with_wrong_secret_returns_403_not_422(self):
+        """Auth rejection must occur before schema validation (bad body + wrong secret → 403)."""
+        client = self._client(telegram_webhook_secret="correct-secret")
+        response = client.post(
+            "/telegram/webhook",
+            json={"bad": "data"},
             headers={"X-Telegram-Bot-Api-Secret-Token": "wrong-secret"},
         )
         assert response.status_code == 403

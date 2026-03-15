@@ -27,6 +27,9 @@
   - [x] Return 502 on send_message failure so Telegram retries the update (PR-5-fix-5)
   - [x] Gate routing on supported providers; unsupported URLs get explicit non-analysis reply (PR-5-fix-6)
   - [x] Recognise abnb.me short/share links as supported Airbnb URLs (PR-5-fix-7)
+  - [x] Inspect all URLs in a message and choose a supported listing URL when present (PR-5-fix-8)
+  - [x] Tighten provider detection to airbnb.com/rooms/<id> listing paths only; abnb.me share links remain supported (PR-5-fix-8)
+  - [x] Move webhook secret validation ahead of request body parsing so unauthenticated requests are rejected before schema validation (PR-5-fix-8)
 - [ ] Define normalized listing schemas and persistence models
 - [ ] Add provider detection and the Airbnb adapter interface
 - [ ] Integrate Apify-backed Airbnb extraction
@@ -36,7 +39,7 @@
 
 ## Validation
 
-- [ ] Add tests for provider detection
+- [x] Add tests for provider detection (URL routing and is_supported_provider — PR-5-fix-8)
 - [ ] Add tests for normalized listing mapping
 - [ ] Add tests for Telegram output formatting
 - [ ] Add orchestration tests for partial enrichment scenarios

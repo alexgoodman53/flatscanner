@@ -15,23 +15,34 @@ def extract_url(text: str) -> str | None:
     return match.group(0).rstrip(".,;)>") if match else None
 
 
-def is_supported_provider(url: str) -> bool:
-    """Return True if *url* belongs to a supported listing provider (Airbnb).
+def extract_urls(text: str) -> list[str]:
+    """Return all HTTP/HTTPS URLs found in *text* (trailing punctuation stripped)."""
+    return [m.rstrip(".,;)>") for m in _URL_RE.findall(text)]
 
-    Recognised Airbnb hostnames:
-    - airbnb.com / *.airbnb.com
-    - abnb.me / *.abnb.me  (Airbnb short/share links)
+
+def is_supported_provider(url: str) -> bool:
+    """Return True if *url* is a supported Airbnb listing URL.
+
+    Recognised patterns:
+    - airbnb.com/rooms/<id> and *.airbnb.com/rooms/<id>  (listing pages only)
+    - abnb.me/<code> and *.abnb.me/<code>  (Airbnb short/share links — always listings)
+
+    Non-listing Airbnb pages (help, search, profiles, etc.) are not supported.
     """
     try:
-        host = urlparse(url).hostname or ""
+        parsed = urlparse(url)
+        host = parsed.hostname or ""
+        path = parsed.path
     except Exception:
         return False
-    return (
-        host == "airbnb.com"
-        or host.endswith(".airbnb.com")
-        or host == "abnb.me"
-        or host.endswith(".abnb.me")
-    )
+
+    if host == "abnb.me" or host.endswith(".abnb.me"):
+        return True
+
+    if host == "airbnb.com" or host.endswith(".airbnb.com"):
+        return path.startswith("/rooms/")
+
+    return False
 
 
 class IgnoreDecision(TypedDict):
@@ -63,18 +74,24 @@ def route_update(update: TelegramUpdate) -> RoutingDecision:
 
     - ``ignore``: no message or no text to act on.
     - ``analyse``: message contains a supported provider URL — enqueue an analysis job.
-    - ``unsupported``: message contains a URL from an unsupported provider.
+    - ``unsupported``: message contains URLs but none from a supported provider.
     - ``help``: message has text but no URL — send usage guidance.
+
+    All URLs in the message are inspected; a supported URL is chosen even when it
+    is not the first URL in the text.
     """
     if not update.message or not update.message.text:
         return IgnoreDecision(action="ignore")
 
-    url = extract_url(update.message.text)
+    urls = extract_urls(update.message.text)
     chat_id = update.message.chat.id
 
-    if url:
+    if not urls:
+        return HelpDecision(action="help", chat_id=chat_id)
+
+    for url in urls:
         if is_supported_provider(url):
             return AnalyseDecision(action="analyse", url=url, chat_id=chat_id)
-        return UnsupportedDecision(action="unsupported", url=url, chat_id=chat_id)
 
-    return HelpDecision(action="help", chat_id=chat_id)
+    # No supported URL found — report the first URL as unsupported
+    return UnsupportedDecision(action="unsupported", url=urls[0], chat_id=chat_id)
