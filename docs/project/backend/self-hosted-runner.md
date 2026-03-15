@@ -30,6 +30,7 @@ This repository expects automated PR review to run on a Windows self-hosted GitH
 - Make sure the runner user can execute Claude non-interactively
 - By default, the repository scripts expect `C:\Users\User\.local\bin\claude.exe`
 - If Claude is installed elsewhere, set the repository variable `CLAUDE_CLI_PATH` to the full executable path
+- The Claude review adapter runs with `--permission-mode bypassPermissions`, so keep its prompt context prebuilt and its runtime path limited to non-editing review work
 
 ## Review Flow
 

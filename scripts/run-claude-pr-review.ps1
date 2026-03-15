@@ -190,6 +190,10 @@ $diffBlock
         throw 'Claude review output is missing required fields.'
     }
 
+    if (@('approve', 'comment', 'request_changes') -notcontains [string]$result.verdict) {
+        throw "Claude review output contains an invalid verdict: $($result.verdict)"
+    }
+
     $findings = @()
     if ($result.findings) {
         $findings = @($result.findings)
