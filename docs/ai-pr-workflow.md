@@ -63,6 +63,8 @@ That starts the `Claude Fix PR` workflow on the self-hosted runner running on th
 
 Because GitHub does not automatically fan out new PR workflows from a workflow-authored push made with `GITHUB_TOKEN`, the `Claude Fix PR` workflow checks out the PR branch without persisted workflow credentials and relies on the machine-local git credentials on the self-hosted runner. That makes the follow-up push behave like a normal user-authenticated branch update so the standard PR checks rerun naturally.
 
+`Claude Fix PR` writes a new PR comment for each run so the pull request keeps a visible history of fix attempts, triggers, and follow-up summaries.
+
 ## Local Claude Worker Launches
 
 For new implementation work, Codex may launch Claude CLI locally with the repository orchestration scripts documented in `docs/claude-worker-orchestration.md`.
@@ -79,6 +81,7 @@ Guardrails:
 - The self-hosted runner executes local `codex exec` on every non-draft PR update
 - The workflow posts a sticky comment marked with `<!-- codex-ai-review -->`
 - The same comment is updated on subsequent pushes, so the PR keeps one current review summary instead of accumulating many stale comments
+- `Claude Fix PR` is intentionally different: each fix run posts a fresh comment instead of overwriting the prior one, so maintainers can audit the iteration history in the PR thread
 - If the review verdict is `request_changes`, the `codex-review` check fails and blocks merge
 - The review step must be launched through an explicit `powershell -File` invocation rather than relying on inline shell execution
 - The workflow must always print the review diagnostic and transcript logs after the review step so false-negative job failures can be traced from the GitHub run itself

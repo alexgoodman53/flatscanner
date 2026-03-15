@@ -45,6 +45,8 @@ A maintainer can ask Claude to continue work on an existing PR by either:
 
 That triggers the `Claude Fix PR` workflow on the self-hosted runner. Claude then reads the PR context, the sticky Codex review comment, and the active spec before pushing follow-up commits to the same branch.
 
+Each `Claude Fix PR` run leaves its own PR comment, so you can inspect the sequence of fix attempts instead of only seeing the latest run.
+
 ## Rules While Iterating
 
 - Do not open a replacement PR for the same work unless explicitly instructed

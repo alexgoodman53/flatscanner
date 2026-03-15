@@ -37,6 +37,9 @@ $headers = @{
 $pr = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/$repository/pulls/$prNumber"
 $issueComments = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/$repository/issues/$prNumber/comments"
 $reviewComments = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/repos/$repository/pulls/$prNumber/comments"
+$runId = if ($env:GITHUB_RUN_ID) { $env:GITHUB_RUN_ID } else { 'local' }
+$runAttempt = if ($env:GITHUB_RUN_ATTEMPT) { $env:GITHUB_RUN_ATTEMPT } else { '1' }
+$triggerSource = if ($env:TRIGGER_LABEL) { "label:$($env:TRIGGER_LABEL)" } elseif ($event.issue -and $event.comment) { 'comment:/claude-fix' } else { 'workflow_dispatch' }
 
 $codexReview = $issueComments | Where-Object { $_.body -like '*<!-- codex-ai-review -->*' } | Select-Object -Last 1
 $humanIssueComments = $issueComments | Where-Object { $_.body -notlike '*<!-- codex-ai-review -->*' -and $_.body -notlike '*<!-- claude-pr-fix -->*' }
@@ -116,6 +119,10 @@ $body = @"
 $marker
 ## Claude PR Fix Run
 
+Run: `$runId` attempt `$runAttempt`
+Trigger: `$triggerSource`
+Head ref: `$headRef`
+
 $changeSummary
 
 ### Summary
@@ -129,16 +136,9 @@ $($result.follow_up)
 "@
 
 $commentsUrl = "https://api.github.com/repos/$repository/issues/$prNumber/comments"
-$existing = $issueComments | Where-Object { $_.body -like "*$marker*" } | Select-Object -Last 1
 $payload = @{ body = $body } | ConvertTo-Json
 
-if ($existing) {
-    $updateUrl = "https://api.github.com/repos/$repository/issues/comments/$($existing.id)"
-    Invoke-RestMethod -Headers $headers -Uri $updateUrl -Method Patch -Body $payload | Out-Null
-}
-else {
-    Invoke-RestMethod -Headers $headers -Uri $commentsUrl -Method Post -Body $payload | Out-Null
-}
+Invoke-RestMethod -Headers $headers -Uri $commentsUrl -Method Post -Body $payload | Out-Null
 
 if ($env:TRIGGER_LABEL -eq 'claude-fix') {
     try {
