@@ -77,9 +77,14 @@ Set-Content -Path $runtimePrompt -Value ($template + $runtimeSection)
 
 Write-Host 'Running local Codex CLI review'
 Get-Content $runtimePrompt -Raw | codex exec - --output-schema $schemaPath --output-last-message $outputPath --sandbox read-only --color never --ephemeral -C $repoRoot
+$codexExitCode = $LASTEXITCODE
 
 if (-not (Test-Path $outputPath)) {
     throw 'Codex review did not produce an output file.'
+}
+
+if ($codexExitCode -ne 0) {
+    Write-Warning "codex exec exited with code $codexExitCode but produced review output; continuing with structured result handling."
 }
 
 $result = Get-Content $outputPath -Raw | ConvertFrom-Json
@@ -144,3 +149,5 @@ else {
 if ($result.verdict -eq 'request_changes') {
     throw 'Codex review requested changes.'
 }
+
+$global:LASTEXITCODE = 0
