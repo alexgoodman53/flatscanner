@@ -2,14 +2,14 @@
 
 ## Summary
 
-Upgrade the repository from a placeholder AI review scaffold to an enforceable pull-request workflow where Claude Code authors implementation PRs, Codex reviews them automatically through a self-hosted GitHub runner, and a human remains the final merge authority.
+Upgrade the repository from a placeholder AI review scaffold to an enforceable pull-request workflow where Claude Code authors implementation PRs, automated AI review runs through a self-hosted GitHub runner, and a human remains the final merge authority.
 
 ## Files And Areas
 
 - `AGENTS.md` and `CLAUDE.md` for explicit agent responsibilities
 - `docs/adr/002-ai-development-workflow.md` for the durable workflow decision
 - `specs/002-ai-pr-workflow/` for execution tracking
-- `.github/workflows/ai-review.yml` for automated Codex PR review on a self-hosted runner
+- `.github/workflows/ai-review.yml` for automated AI PR review on a self-hosted runner
 - `.github/pull_request_template.md` for consistent PR metadata
 - `.github/CODEOWNERS` for repository ownership defaults
 - `.github/codex/` for reusable review prompts and schema files
@@ -19,8 +19,8 @@ Upgrade the repository from a placeholder AI review scaffold to an enforceable p
 
 1. Claude implements a scoped task from the active spec in a feature branch
 2. Claude opens a pull request using the repository template
-3. GitHub Actions runs CI, PR guard, and Codex review automatically
-4. The self-hosted runner invokes local `codex exec` and posts a sticky review comment on the pull request
+3. GitHub Actions runs CI, PR guard, and AI review automatically
+4. The self-hosted runner invokes the selected local review adapter and posts a sticky review comment on the pull request
 5. A human decides whether to merge after required checks are green
 
 ## Self-Hosted Design

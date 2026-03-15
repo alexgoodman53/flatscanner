@@ -17,23 +17,6 @@ function Write-Diagnostic {
     Add-Content -Path $script:diagnosticPath -Value $line
 }
 
-function Invoke-NativeCommand {
-    param(
-        [Parameter(Mandatory = $true)]
-        [scriptblock]$Command,
-        [Parameter(Mandatory = $true)]
-        [string]$Description
-    )
-
-    Write-Diagnostic "Starting native command: $Description"
-    & $Command
-    $nativeExitCode = $LASTEXITCODE
-    Write-Diagnostic "Completed native command: $Description (exit=$nativeExitCode)"
-    if ($nativeExitCode -ne 0) {
-        throw "$Description failed with exit code $nativeExitCode."
-    }
-}
-
 try {
     if (Test-Path $script:diagnosticPath) {
         Remove-Item $script:diagnosticPath -Force
@@ -51,7 +34,12 @@ try {
     $githubToken = $env:GITHUB_TOKEN
     $repository = $env:GITHUB_REPOSITORY
     $marker = '<!-- ai-review -->'
-    $agentLabel = 'Codex'
+    $agentLabel = 'Claude'
+    $claudePath = if ($env:CLAUDE_CLI_PATH) { $env:CLAUDE_CLI_PATH } else { 'C:\Users\User\.local\bin\claude.exe' }
+
+    if (-not (Test-Path $claudePath)) {
+        throw "Claude CLI not found at $claudePath"
+    }
 
     if (-not $eventPath -or -not (Test-Path $eventPath)) {
         throw 'GITHUB_EVENT_PATH is missing. This script must run inside GitHub Actions.'
@@ -95,15 +83,21 @@ try {
 
     Write-Diagnostic "Preparing review context for PR #$prNumber ($baseSha..$headSha)"
 
-    Invoke-NativeCommand -Description "git fetch origin $baseRef" -Command { git fetch --no-tags origin $baseRef }
-    Invoke-NativeCommand -Description "git fetch PR head refs/pull/$prNumber/head" -Command { git fetch --no-tags origin "+refs/pull/$prNumber/head:refs/remotes/origin/pr/$prNumber" }
+    git fetch --no-tags origin $baseRef
+    if ($LASTEXITCODE -ne 0) {
+        throw "git fetch origin $baseRef failed with exit code $LASTEXITCODE."
+    }
+
+    git fetch --no-tags origin "+refs/pull/$prNumber/head:refs/remotes/origin/pr/$prNumber"
+    if ($LASTEXITCODE -ne 0) {
+        throw "git fetch PR head refs/pull/$prNumber/head failed with exit code $LASTEXITCODE."
+    }
 
     $changedFiles = git diff --name-only $baseSha $headSha
     $changedFilesBlock = if ($changedFiles) { ($changedFiles -join [Environment]::NewLine) } else { '(no changed files reported)' }
 
-    $runtimePrompt = Join-Path $script:tempRoot 'ai-review-prompt.md'
-    $templatePrompt = Join-Path $repoRoot '.github\codex\prompts\pr-review.md'
-    $schemaPath = Join-Path $repoRoot '.github\review\schemas\pr-review.schema.json'
+    $runtimePrompt = Join-Path $script:tempRoot 'claude-review-prompt.md'
+    $templatePrompt = Join-Path $repoRoot '.github\claude\prompts\pr-review.md'
     $outputPath = Join-Path $script:tempRoot 'ai-review-output.json'
 
     $template = Get-Content $templatePrompt -Raw
@@ -128,30 +122,41 @@ You may inspect repository files and run read-only git commands if needed.
     Set-Content -Path $runtimePrompt -Value ($template + $runtimeSection)
     Write-Diagnostic "Runtime prompt written to $runtimePrompt"
 
-    Write-Diagnostic 'Running local Codex CLI review'
     if (Test-Path $outputPath) {
         Remove-Item $outputPath -Force
-        Write-Diagnostic "Removed stale output file $outputPath"
     }
 
-    Get-Content $runtimePrompt -Raw | codex exec - --output-schema $schemaPath --output-last-message $outputPath --sandbox read-only --color never --ephemeral -C $repoRoot
-    $codexExitCode = $LASTEXITCODE
-    Write-Diagnostic "codex exec completed with exit code $codexExitCode"
+    $promptText = (Get-Content $runtimePrompt -Raw).Trim() + @"
 
-    if ($codexExitCode -ne 0) {
-        throw "codex exec failed with exit code $codexExitCode."
+Output only one minified JSON object with exactly three top-level keys: summary, verdict, findings.
+Use verdict values only from: approve, comment, request_changes.
+Set findings to an array. Each finding object must contain severity, file, line, title, and body.
+Do not include markdown, code fences, or prose before or after the JSON.
+"@
+
+    Write-Diagnostic 'Running local Claude CLI review'
+    & $claudePath -p $promptText --output-format text --permission-mode bypassPermissions --allowedTools Bash,Glob,Grep,Read | Tee-Object -FilePath ($outputPath + '.stdout') | Out-Null
+    $claudeExitCode = $LASTEXITCODE
+    Write-Diagnostic "claude review completed with exit code $claudeExitCode"
+
+    if ($claudeExitCode -ne 0) {
+        throw "Claude CLI review failed with exit code $claudeExitCode."
     }
 
-    if (-not (Test-Path $outputPath)) {
-        throw 'AI review did not produce an output file.'
+    $resultText = (Get-Content ($outputPath + '.stdout') -Raw).Trim()
+    if (-not $resultText) {
+        throw 'Claude review output was empty.'
     }
 
-    $outputMetadata = Get-Item $outputPath
-    Write-Diagnostic "Codex output file present at $outputPath (size=$($outputMetadata.Length))"
+    try {
+        $result = $resultText | ConvertFrom-Json
+    }
+    catch {
+        throw "Claude review output was not valid JSON: $resultText"
+    }
 
-    $result = Get-Content $outputPath -Raw | ConvertFrom-Json
     if (-not $result.summary -or -not $result.verdict) {
-        throw 'AI review output is missing required fields.'
+        throw 'Claude review output is missing required fields.'
     }
 
     $findings = @()
@@ -184,7 +189,7 @@ You may inspect repository files and run read-only git commands if needed.
         $findingsBlock = 'No review findings.'
     }
 
-$body = @"
+    $body = @"
 $marker
 ## AI Review
 
@@ -217,7 +222,7 @@ $findingsBlock
         throw 'AI review requested changes.'
     }
 
-    Write-Diagnostic 'Codex AI review completed successfully'
+    Write-Diagnostic 'Claude AI review completed successfully'
     $script:exitCode = 0
 }
 catch {

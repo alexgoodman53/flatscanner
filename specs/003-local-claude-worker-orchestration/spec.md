@@ -2,7 +2,7 @@
 
 ## Context
 
-The repository already supports Claude-authored pull requests and Codex review. The next step is to let Codex launch Claude CLI locally for scoped implementation tasks, including limited parallel workers, without breaking branch discipline or repository memory.
+The repository already supports Claude-authored pull requests and automated AI review. The next step is to let Codex launch Claude CLI locally for scoped implementation tasks, including limited parallel workers, without breaking branch discipline or repository memory.
 
 ## Scope
 
@@ -21,7 +21,7 @@ The repository already supports Claude-authored pull requests and Codex review. 
 ## Requirements
 
 - Every Claude worker must use an isolated git worktree and a dedicated branch
-- The orchestration model must preserve the existing PR flow and Codex review loop
+- The orchestration model must preserve the existing PR flow and AI review loop
 - The repository must provide a repeatable local script for starting a Claude worker from a scoped task
 - The repository must provide a repeatable local script for publishing or reusing a PR from a worker branch
 - Durable docs must explain when parallel workers are allowed and when they are not

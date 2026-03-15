@@ -28,8 +28,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  codex-review:
+  ai-review:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    name: AI Review
     runs-on:
       - self-hosted
       - windows
@@ -42,22 +43,24 @@ jobs:
           fetch-depth: 0
           ref: ${{ inputs.ref || github.ref }}
 
-      - name: Run local Codex review
+      - name: Run local AI review
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ inputs.pr_number }}
-        run: powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .\scripts\run-codex-pr-review.ps1
+          AI_REVIEW_AGENT: ${{ vars.AI_REVIEW_AGENT }}
+          CLAUDE_CLI_PATH: ${{ vars.CLAUDE_CLI_PATH }}
+        run: powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .\scripts\run-ai-pr-review.ps1
 
       - name: Print review diagnostics
         if: always()
         shell: powershell
         run: |
           $tempRoot = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { $env:TEMP }
-          $diagnosticPath = Join-Path $tempRoot 'codex-review-diagnostics.log'
-          $transcriptPath = Join-Path $tempRoot 'codex-review-transcript.log'
+          $diagnosticPath = Join-Path $tempRoot 'ai-review-diagnostics.log'
+          $transcriptPath = Join-Path $tempRoot 'ai-review-transcript.log'
 
           if (Test-Path $diagnosticPath) {
-            Write-Host '--- codex-review-diagnostics.log ---'
+            Write-Host '--- ai-review-diagnostics.log ---'
             Get-Content $diagnosticPath
           }
           else {
@@ -65,7 +68,7 @@ jobs:
           }
 
           if (Test-Path $transcriptPath) {
-            Write-Host '--- codex-review-transcript.log ---'
+            Write-Host '--- ai-review-transcript.log ---'
             Get-Content $transcriptPath
           }
           else {

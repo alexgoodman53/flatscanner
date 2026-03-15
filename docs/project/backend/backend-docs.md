@@ -55,7 +55,9 @@ Initial backend direction is chosen and should be treated as the current default
 ## Delivery Infrastructure
 
 - Automated PR review runs on a Windows self-hosted GitHub runner labeled `codex`
-- The runner invokes a local Codex adapter script so review can use the machine-local Codex setup
+- The `AI Review` workflow selects the local review adapter only from the repository variable `AI_REVIEW_AGENT`
+- Supported `AI_REVIEW_AGENT` values are `claude` and `codex`; missing or invalid values fall back to `claude`
+- The runner host must therefore support the selected local reviewer CLI
 - Setup instructions live in `docs/project/backend/self-hosted-runner.md`
 - Codex may also launch local Claude CLI workers on the same machine through isolated git worktrees
 - Claude worker orchestration instructions live in `docs/claude-worker-orchestration.md`

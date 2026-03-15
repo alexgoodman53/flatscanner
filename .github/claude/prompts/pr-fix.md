@@ -14,7 +14,7 @@ Before making changes:
 Task:
 
 - Work only on the current pull request branch
-- Read the current pull request diff, the sticky Codex review comment, and any human review comments
+- Read the current pull request diff, the sticky AI review comment, and any human review comments
 - Fix the blocking findings in the same branch
 - Update tests, docs, and spec artifacts when needed
 - Keep the change scoped to the review findings and the active feature intent
