@@ -162,7 +162,7 @@ $diffBlock
     $promptText = (Get-Content $runtimePrompt -Raw).Trim()
 
     Write-Diagnostic 'Running local Claude CLI review'
-    $resultText = $promptText | & $claudePath -p --output-format text --permission-mode bypassPermissions
+    $resultText = $promptText | & $claudePath -p --output-format text --permission-mode default --tools '""'
     $claudeExitCode = $LASTEXITCODE
     Write-Diagnostic "claude review completed with exit code $claudeExitCode"
 
@@ -177,6 +177,14 @@ $diffBlock
 
     if ($resultText.StartsWith('```')) {
         $resultText = ($resultText -replace '^```[a-zA-Z0-9_-]*\s*', '' -replace '\s*```$', '').Trim()
+    }
+
+    if (-not $resultText.StartsWith('{')) {
+        $jsonStart = $resultText.IndexOf('{')
+        $jsonEnd = $resultText.LastIndexOf('}')
+        if ($jsonStart -ge 0 -and $jsonEnd -gt $jsonStart) {
+            $resultText = $resultText.Substring($jsonStart, ($jsonEnd - $jsonStart + 1)).Trim()
+        }
     }
 
     try {
