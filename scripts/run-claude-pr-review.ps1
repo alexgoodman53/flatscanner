@@ -95,11 +95,43 @@ try {
 
     $changedFiles = git diff --name-only $baseSha $headSha
     $changedFilesBlock = if ($changedFiles) { ($changedFiles -join [Environment]::NewLine) } else { '(no changed files reported)' }
+    $diffBlock = git diff --unified=3 $baseSha $headSha
+    if (-not $diffBlock) {
+        $diffBlock = '(no diff reported)'
+    }
+
+    $contextFiles = @(
+        '.specify/memory/constitution.md',
+        'docs/README.md',
+        'docs/project-idea.md',
+        'docs/project/frontend/frontend-docs.md',
+        'docs/project/backend/backend-docs.md'
+    )
+
+    $adrFiles = Get-ChildItem (Join-Path $repoRoot 'docs\adr') -Filter '*.md' | Sort-Object Name | ForEach-Object {
+        Resolve-Path -Relative $_.FullName
+    }
+
+    $specFiles = @()
+    if ($changedFiles) {
+        $specFiles = $changedFiles | Where-Object { $_ -like 'specs/*/spec.md' -or $_ -like 'specs/*/plan.md' -or $_ -like 'specs/*/tasks.md' }
+    }
+
+    $governingFiles = @($contextFiles + $adrFiles + $specFiles) | Where-Object { $_ } | Select-Object -Unique
+    $contextBlocks = foreach ($relativePath in $governingFiles) {
+        $normalizedPath = $relativePath -replace '^[.][\\/]', ''
+        $fullPath = Join-Path $repoRoot $normalizedPath
+        if (Test-Path $fullPath) {
+            @(
+                "### File: $normalizedPath",
+                (Get-Content $fullPath -Raw)
+            ) -join [Environment]::NewLine
+        }
+    }
+    $contextBlock = if ($contextBlocks) { $contextBlocks -join ([Environment]::NewLine + [Environment]::NewLine) } else { 'No governing context files were loaded.' }
 
     $runtimePrompt = Join-Path $script:tempRoot 'claude-review-prompt.md'
     $templatePrompt = Join-Path $repoRoot '.github\claude\prompts\pr-review.md'
-    $outputPath = Join-Path $script:tempRoot 'ai-review-output.json'
-
     $template = Get-Content $templatePrompt -Raw
     $runtimeSection = @"
 
@@ -116,26 +148,21 @@ try {
 ### Changed Files
 $changedFilesBlock
 
-Review the git diff between $baseSha and $headSha only, but use the repository docs and specs as governing context.
-You may inspect repository files and run read-only git commands if needed.
+## Governing Context
+
+$contextBlock
+
+## Unified Diff
+
+$diffBlock
 "@
     Set-Content -Path $runtimePrompt -Value ($template + $runtimeSection)
     Write-Diagnostic "Runtime prompt written to $runtimePrompt"
 
-    if (Test-Path $outputPath) {
-        Remove-Item $outputPath -Force
-    }
-
-    $promptText = (Get-Content $runtimePrompt -Raw).Trim() + @"
-
-Output only one minified JSON object with exactly three top-level keys: summary, verdict, findings.
-Use verdict values only from: approve, comment, request_changes.
-Set findings to an array. Each finding object must contain severity, file, line, title, and body.
-Do not include markdown, code fences, or prose before or after the JSON.
-"@
+    $promptText = (Get-Content $runtimePrompt -Raw).Trim()
 
     Write-Diagnostic 'Running local Claude CLI review'
-    & $claudePath -p $promptText --output-format text --permission-mode bypassPermissions --allowedTools Bash,Glob,Grep,Read | Tee-Object -FilePath ($outputPath + '.stdout') | Out-Null
+    $resultText = $promptText | & $claudePath -p --output-format text --permission-mode bypassPermissions
     $claudeExitCode = $LASTEXITCODE
     Write-Diagnostic "claude review completed with exit code $claudeExitCode"
 
@@ -143,9 +170,13 @@ Do not include markdown, code fences, or prose before or after the JSON.
         throw "Claude CLI review failed with exit code $claudeExitCode."
     }
 
-    $resultText = (Get-Content ($outputPath + '.stdout') -Raw).Trim()
+    $resultText = $resultText.Trim()
     if (-not $resultText) {
         throw 'Claude review output was empty.'
+    }
+
+    if ($resultText.StartsWith('```')) {
+        $resultText = ($resultText -replace '^```[a-zA-Z0-9_-]*\s*', '' -replace '\s*```$', '').Trim()
     }
 
     try {
@@ -162,6 +193,15 @@ Do not include markdown, code fences, or prose before or after the JSON.
     $findings = @()
     if ($result.findings) {
         $findings = @($result.findings)
+    }
+
+    foreach ($finding in $findings) {
+        if (-not $finding.severity -or -not $finding.file -or -not $finding.title -or -not $finding.body) {
+            throw 'Claude review output contains a finding with missing required fields.'
+        }
+        if ($null -ne $finding.line -and ($finding.line -as [int]) -lt 1) {
+            throw 'Claude review output contains a finding with an invalid line number.'
+        }
     }
 
     Write-Diagnostic "Review verdict=$($result.verdict); findings=$($findings.Count)"
