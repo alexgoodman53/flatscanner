@@ -63,18 +63,24 @@ async def webhook(request: Request) -> dict:
     try:
         await send_message(settings.telegram_bot_token, decision["chat_id"], text)
     except httpx.HTTPStatusError as exc:
-        if exc.response.status_code < 500:
-            # Permanent 4xx failure (e.g. bad token, blocked chat): Telegram will
-            # not retry on its own for these, so acknowledge to avoid retry loops.
-            logger.error(
-                "send_message permanent failure for chat_id=%s: %s",
+        status = exc.response.status_code
+        if status == 429 or status >= 500:
+            # 429 Too Many Requests and 5xx are transient — signal Telegram to retry.
+            logger.exception(
+                "send_message transient failure (status=%s) for chat_id=%s",
+                status,
                 decision["chat_id"],
-                exc,
             )
-            return {"ok": True}
-        # 5xx — transient server error; signal Telegram to retry.
-        logger.exception("send_message server error for chat_id=%s", decision["chat_id"])
-        raise HTTPException(status_code=502, detail="Failed to deliver reply to Telegram")
+            raise HTTPException(status_code=502, detail="Failed to deliver reply to Telegram")
+        # Other 4xx failures are permanent (e.g. bad token, blocked chat): acknowledge
+        # to avoid retry loops since Telegram won't help by retrying.
+        logger.error(
+            "send_message permanent failure (status=%s) for chat_id=%s: %s",
+            status,
+            decision["chat_id"],
+            exc,
+        )
+        return {"ok": True}
     except Exception:
         # Network / timeout / unexpected errors — transient; let Telegram retry.
         logger.exception("send_message failed for chat_id=%s", decision["chat_id"])

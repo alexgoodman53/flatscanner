@@ -507,6 +507,19 @@ class TestWebhookEndpoint:
         assert response.status_code == 200
 
     @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_webhook_returns_502_on_429_telegram_error(self, mock_send):
+        """429 Too Many Requests is transient — webhook must return 502 so Telegram retries."""
+        mock_send.side_effect = httpx.HTTPStatusError(
+            "429 Too Many Requests",
+            request=httpx.Request("POST", "https://api.telegram.org/bottoken/sendMessage"),
+            response=httpx.Response(429),
+        )
+        client = self._client()
+        payload = self._update_payload("https://airbnb.com/rooms/1")
+        response = client.post("/telegram/webhook", json=payload)
+        assert response.status_code == 502
+
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
     def test_webhook_caption_airbnb_url_triggers_analyse_reply(self, mock_send):
         """An Airbnb URL in a media caption must route to analysis just like message text."""
         client = self._client()
