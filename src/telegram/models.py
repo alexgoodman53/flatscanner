@@ -19,6 +19,7 @@ class TelegramMessage(BaseModel):
     from_: TelegramUser | None = Field(default=None, alias="from")
     chat: TelegramChat
     text: str | None = None
+    caption: str | None = None
 
     model_config = {"populate_by_name": True}
 

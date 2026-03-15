@@ -20,6 +20,9 @@ _AIRBNB_HOST_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Requires at least one non-separator character after /rooms/ — rejects bare /rooms/
+_AIRBNB_LISTING_PATH_RE = re.compile(r"^/rooms/[^/?#\s]+", re.IGNORECASE)
+
 
 def extract_url(text: str) -> str | None:
     """Return the first HTTP/HTTPS URL found in *text*, or None."""
@@ -50,10 +53,11 @@ def is_supported_provider(url: str) -> bool:
         return False
 
     if host == "abnb.me" or host.endswith(".abnb.me"):
-        return True
+        # Require a non-empty path segment (bare abnb.me/ with no code is not a listing)
+        return bool(path) and path != "/"
 
     if _AIRBNB_HOST_RE.match(host):
-        return path.startswith("/rooms/")
+        return bool(_AIRBNB_LISTING_PATH_RE.match(path))
 
     return False
 
@@ -93,10 +97,15 @@ def route_update(update: TelegramUpdate) -> RoutingDecision:
     All URLs in the message are inspected; a supported URL is chosen even when it
     is not the first URL in the text.
     """
-    if not update.message or not update.message.text:
+    if not update.message:
         return IgnoreDecision(action="ignore")
 
-    urls = extract_urls(update.message.text)
+    # Accept text from the message body or from a media caption (photo/video with URL)
+    text = update.message.text or update.message.caption or ""
+    if not text:
+        return IgnoreDecision(action="ignore")
+
+    urls = extract_urls(text)
     chat_id = update.message.chat.id
 
     if not urls:

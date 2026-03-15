@@ -32,6 +32,8 @@
   - [x] Move webhook secret validation ahead of request body parsing so unauthenticated requests are rejected before schema validation (PR-5-fix-8)
   - [x] Expand Airbnb provider detection to cover all localized domains (e.g. airbnb.co.uk, airbnb.de, airbnb.com.au) while keeping listing-path restriction (PR-5-fix-9)
   - [x] Acknowledge permanent 4xx Telegram delivery failures (return 200); return 502 only for transient 5xx/network errors so Telegram retries appropriately (PR-5-fix-9)
+  - [x] Require a real listing ID after /rooms/ (bare /rooms/ path rejected); require non-empty path for abnb.me shortlinks (PR-5-fix-10)
+  - [x] Route messages with Airbnb URLs in media captions the same as text messages (PR-5-fix-10)
 - [ ] Define normalized listing schemas and persistence models
 - [ ] Add provider detection and the Airbnb adapter interface
 - [ ] Integrate Apify-backed Airbnb extraction
@@ -44,6 +46,7 @@
 - [x] Add tests for provider detection (URL routing and is_supported_provider — PR-5-fix-8)
 - [x] Add tests for localized Airbnb domain detection (PR-5-fix-9)
 - [x] Add tests for 4xx-vs-5xx webhook failure differentiation (PR-5-fix-9)
+- [x] Add tests for malformed /rooms/ and abnb.me URLs, and caption-based routing (PR-5-fix-10)
 - [ ] Add tests for normalized listing mapping
 - [ ] Add tests for Telegram output formatting
 - [ ] Add orchestration tests for partial enrichment scenarios

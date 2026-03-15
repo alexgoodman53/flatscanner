@@ -34,6 +34,24 @@ def _make_update(
     return TelegramUpdate(update_id=update_id, message=message)
 
 
+def _make_caption_update(
+    caption: str | None,
+    chat_id: int = 1001,
+    update_id: int = 1,
+) -> TelegramUpdate:
+    """Build a TelegramUpdate with no text body but a media caption."""
+    user = TelegramUser(id=42, first_name="Alice")
+    chat = TelegramChat(id=chat_id, type="private")
+    message = TelegramMessage(
+        message_id=1,
+        **{"from": user},
+        chat=chat,
+        text=None,
+        caption=caption,
+    )
+    return TelegramUpdate(update_id=update_id, message=message)
+
+
 def _test_settings(**overrides) -> Settings:
     defaults = {
         "app_env": "testing",
@@ -164,6 +182,26 @@ class TestIsSupportedProvider:
     def test_airbnb_listing_rooms_path_is_supported(self):
         assert is_supported_provider("https://www.airbnb.com/rooms/12345678") is True
 
+    # --- Malformed /rooms/ paths ---
+
+    def test_airbnb_bare_rooms_path_is_not_supported(self):
+        # /rooms/ with no listing ID must not trigger analysis
+        assert is_supported_provider("https://www.airbnb.com/rooms/") is False
+
+    def test_airbnb_rooms_path_no_trailing_slash_is_not_supported(self):
+        # /rooms with no slash or ID must not trigger analysis
+        assert is_supported_provider("https://www.airbnb.com/rooms") is False
+
+    # --- Malformed abnb.me paths ---
+
+    def test_abnb_me_root_path_is_not_supported(self):
+        # https://abnb.me/ with no share code must not trigger analysis
+        assert is_supported_provider("https://abnb.me/") is False
+
+    def test_abnb_me_no_path_is_not_supported(self):
+        # https://abnb.me with no path at all must not trigger analysis
+        assert is_supported_provider("https://abnb.me") is False
+
 
 # ---------------------------------------------------------------------------
 # route_update
@@ -240,6 +278,59 @@ class TestRouteUpdate:
         decision = route_update(update)
         assert decision["action"] == "unsupported"
         assert decision["url"] == "https://www.booking.com/hotel/abc"
+
+
+# ---------------------------------------------------------------------------
+# Caption-based routing
+# ---------------------------------------------------------------------------
+
+
+class TestCaptionRouting:
+    """Airbnb links in media captions must route identically to text messages."""
+
+    def test_analyse_when_airbnb_url_in_caption(self):
+        update = _make_caption_update("https://www.airbnb.com/rooms/999", chat_id=5)
+        decision = route_update(update)
+        assert decision["action"] == "analyse"
+        assert decision["url"] == "https://www.airbnb.com/rooms/999"
+        assert decision["chat_id"] == 5
+
+    def test_analyse_when_abnb_me_url_in_caption(self):
+        update = _make_caption_update("https://abnb.me/abc123", chat_id=6)
+        decision = route_update(update)
+        assert decision["action"] == "analyse"
+        assert decision["url"] == "https://abnb.me/abc123"
+
+    def test_unsupported_when_non_airbnb_url_in_caption(self):
+        update = _make_caption_update("https://www.booking.com/hotel/xyz", chat_id=9)
+        decision = route_update(update)
+        assert decision["action"] == "unsupported"
+
+    def test_help_when_caption_has_no_url(self):
+        update = _make_caption_update("Nice place!", chat_id=7)
+        decision = route_update(update)
+        assert decision["action"] == "help"
+
+    def test_ignore_when_caption_is_none(self):
+        update = _make_caption_update(caption=None)
+        decision = route_update(update)
+        assert decision["action"] == "ignore"
+
+    def test_text_takes_precedence_over_caption(self):
+        """If a message has both text and caption, text should drive routing."""
+        user = TelegramUser(id=42, first_name="Alice")
+        chat = TelegramChat(id=5, type="private")
+        message = TelegramMessage(
+            message_id=1,
+            **{"from": user},
+            chat=chat,
+            text="https://www.airbnb.com/rooms/111",
+            caption="https://www.booking.com/hotel/xyz",
+        )
+        update = TelegramUpdate(update_id=1, message=message)
+        decision = route_update(update)
+        assert decision["action"] == "analyse"
+        assert decision["url"] == "https://www.airbnb.com/rooms/111"
 
 
 # ---------------------------------------------------------------------------
@@ -414,6 +505,27 @@ class TestWebhookEndpoint:
         payload = self._update_payload("https://airbnb.com/rooms/1")
         response = client.post("/telegram/webhook", json=payload)
         assert response.status_code == 200
+
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_webhook_caption_airbnb_url_triggers_analyse_reply(self, mock_send):
+        """An Airbnb URL in a media caption must route to analysis just like message text."""
+        client = self._client()
+        payload = {
+            "update_id": 1,
+            "message": {
+                "message_id": 1,
+                "from": {"id": 42, "first_name": "Alice"},
+                "chat": {"id": 1001, "type": "private"},
+                "caption": "https://www.airbnb.com/rooms/456",
+            },
+        }
+        response = client.post("/telegram/webhook", json=payload)
+        assert response.status_code == 200
+        assert response.json() == {"ok": True}
+        mock_send.assert_awaited_once()
+        call_args = mock_send.call_args[0]
+        assert call_args[1] == 1001
+        assert "airbnb.com/rooms/456" in call_args[2]
 
 
 # ---------------------------------------------------------------------------
