@@ -3,6 +3,7 @@ $script:exitCode = 1
 $script:transcriptStarted = $false
 $script:tempRoot = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { $env:TEMP }
 $script:diagnosticPath = Join-Path $script:tempRoot 'codex-review-diagnostics.log'
+$script:transcriptPath = Join-Path $script:tempRoot 'codex-review-transcript.log'
 
 function Write-Diagnostic {
     param(
@@ -34,8 +35,15 @@ function Invoke-NativeCommand {
 }
 
 try {
+    if (Test-Path $script:diagnosticPath) {
+        Remove-Item $script:diagnosticPath -Force
+    }
+    if (Test-Path $script:transcriptPath) {
+        Remove-Item $script:transcriptPath -Force
+    }
+
     New-Item -ItemType File -Path $script:diagnosticPath -Force | Out-Null
-    Start-Transcript -Path (Join-Path $script:tempRoot 'codex-review-transcript.log') -Force | Out-Null
+    Start-Transcript -Path $script:transcriptPath -Force | Out-Null
     $script:transcriptStarted = $true
 
     $repoRoot = (Get-Location).Path
