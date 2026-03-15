@@ -8,9 +8,10 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Git ref to validate"
+        description: Git ref to validate
         required: false
         default: ""
+        type: string
 
 jobs:
   baseline-checks:

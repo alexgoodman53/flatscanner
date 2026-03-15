@@ -43,6 +43,8 @@ You can trigger Claude to work on an existing PR in two ways:
 
 That starts the `Claude Fix PR` workflow on the self-hosted runner running on this computer.
 
+Because GitHub does not automatically fan out new PR workflows from a workflow-authored push made with `GITHUB_TOKEN`, the `Claude Fix PR` workflow checks out the PR branch without persisted workflow credentials and relies on the machine-local git credentials on the self-hosted runner. That makes the follow-up push behave like a normal user-authenticated branch update so the standard PR checks rerun naturally.
+
 ## Local Claude Worker Launches
 
 For new implementation work, Codex may launch Claude CLI locally with the repository orchestration scripts documented in `docs/claude-worker-orchestration.md`.

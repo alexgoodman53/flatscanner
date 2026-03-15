@@ -93,6 +93,7 @@ jobs:
           repository: ${{ needs.resolve-pr.outputs.head_repo }}
           ref: ${{ needs.resolve-pr.outputs.head_ref }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Fetch base branch
         shell: powershell
