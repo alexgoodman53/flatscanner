@@ -1,6 +1,7 @@
 """URL extraction and Telegram message routing logic."""
 
 import re
+from urllib.parse import urlparse
 from typing import Literal, TypedDict
 
 from src.telegram.models import TelegramUpdate
@@ -12,6 +13,15 @@ def extract_url(text: str) -> str | None:
     """Return the first HTTP/HTTPS URL found in *text*, or None."""
     match = _URL_RE.search(text)
     return match.group(0).rstrip(".,;)>") if match else None
+
+
+def is_supported_provider(url: str) -> bool:
+    """Return True if *url* belongs to a supported listing provider (Airbnb)."""
+    try:
+        host = urlparse(url).hostname or ""
+    except Exception:
+        return False
+    return host == "airbnb.com" or host.endswith(".airbnb.com")
 
 
 class IgnoreDecision(TypedDict):
@@ -29,14 +39,21 @@ class HelpDecision(TypedDict):
     chat_id: int
 
 
-RoutingDecision = IgnoreDecision | AnalyseDecision | HelpDecision
+class UnsupportedDecision(TypedDict):
+    action: Literal["unsupported"]
+    url: str
+    chat_id: int
+
+
+RoutingDecision = IgnoreDecision | AnalyseDecision | HelpDecision | UnsupportedDecision
 
 
 def route_update(update: TelegramUpdate) -> RoutingDecision:
     """Inspect a Telegram update and return a routing decision.
 
     - ``ignore``: no message or no text to act on.
-    - ``analyse``: message contains a URL — enqueue an analysis job.
+    - ``analyse``: message contains a supported provider URL — enqueue an analysis job.
+    - ``unsupported``: message contains a URL from an unsupported provider.
     - ``help``: message has text but no URL — send usage guidance.
     """
     if not update.message or not update.message.text:
@@ -46,6 +63,8 @@ def route_update(update: TelegramUpdate) -> RoutingDecision:
     chat_id = update.message.chat.id
 
     if url:
-        return AnalyseDecision(action="analyse", url=url, chat_id=chat_id)
+        if is_supported_provider(url):
+            return AnalyseDecision(action="analyse", url=url, chat_id=chat_id)
+        return UnsupportedDecision(action="unsupported", url=url, chat_id=chat_id)
 
     return HelpDecision(action="help", chat_id=chat_id)

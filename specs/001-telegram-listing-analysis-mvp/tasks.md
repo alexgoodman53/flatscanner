@@ -25,6 +25,7 @@
   - [x] Fix stale HTML parse mode claim in sender.py docstring (PR-5-fix-3)
   - [x] Require telegram_bot_token outside development/testing environments (PR-5-fix-4)
   - [x] Return 502 on send_message failure so Telegram retries the update (PR-5-fix-5)
+  - [x] Gate routing on supported providers; unsupported URLs get explicit non-analysis reply (PR-5-fix-6)
 - [ ] Define normalized listing schemas and persistence models
 - [ ] Add provider detection and the Airbnb adapter interface
 - [ ] Integrate Apify-backed Airbnb extraction

@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from src.app.config import Settings
 from src.app.main import create_app
-from src.telegram.dispatcher import extract_url, route_update
+from src.telegram.dispatcher import extract_url, is_supported_provider, route_update
 from src.telegram.models import TelegramChat, TelegramMessage, TelegramUpdate, TelegramUser
 from src.telegram.sender import send_message
 
@@ -77,17 +77,56 @@ class TestExtractUrl:
 
 
 # ---------------------------------------------------------------------------
+# is_supported_provider
+# ---------------------------------------------------------------------------
+
+
+class TestIsSupportedProvider:
+    def test_airbnb_com_is_supported(self):
+        assert is_supported_provider("https://www.airbnb.com/rooms/123") is True
+
+    def test_airbnb_apex_domain_is_supported(self):
+        assert is_supported_provider("https://airbnb.com/rooms/123") is True
+
+    def test_airbnb_country_subdomain_is_supported(self):
+        assert is_supported_provider("https://www.airbnb.co.uk/rooms/123") is False
+
+    def test_booking_com_is_not_supported(self):
+        assert is_supported_provider("https://www.booking.com/hotel/1") is False
+
+    def test_example_com_is_not_supported(self):
+        assert is_supported_provider("https://example.com/flat") is False
+
+    def test_airbnb_look_alike_is_not_supported(self):
+        # hostname doesn't end with .airbnb.com and isn't airbnb.com
+        assert is_supported_provider("https://notairbnb.com/rooms/1") is False
+
+
+# ---------------------------------------------------------------------------
 # route_update
 # ---------------------------------------------------------------------------
 
 
 class TestRouteUpdate:
-    def test_analyse_when_url_present(self):
+    def test_analyse_when_airbnb_url(self):
         update = _make_update("https://www.airbnb.com/rooms/999", chat_id=5)
         decision = route_update(update)
         assert decision["action"] == "analyse"
         assert decision["url"] == "https://www.airbnb.com/rooms/999"
         assert decision["chat_id"] == 5
+
+    def test_unsupported_when_non_airbnb_url(self):
+        update = _make_update("https://www.booking.com/hotel/xyz", chat_id=9)
+        decision = route_update(update)
+        assert decision["action"] == "unsupported"
+        assert decision["url"] == "https://www.booking.com/hotel/xyz"
+        assert decision["chat_id"] == 9
+
+    def test_unsupported_when_generic_url(self):
+        update = _make_update("https://example.com/flat/42", chat_id=11)
+        decision = route_update(update)
+        assert decision["action"] == "unsupported"
+        assert decision["chat_id"] == 11
 
     def test_help_when_no_url(self):
         update = _make_update("What can you do?", chat_id=7)
@@ -221,6 +260,20 @@ class TestWebhookEndpoint:
         call_args = mock_send.call_args[0]
         # Full URL including query string must appear verbatim in the reply text
         assert url_with_params in call_args[2]
+
+    @patch("src.telegram.router.send_message", new_callable=AsyncMock)
+    def test_webhook_unsupported_url_sends_unsupported_reply(self, mock_send):
+        client = self._client()
+        payload = self._update_payload("https://www.booking.com/hotel/xyz", chat_id=1001)
+        response = client.post("/telegram/webhook", json=payload)
+        assert response.status_code == 200
+        assert response.json() == {"ok": True}
+        mock_send.assert_awaited_once()
+        call_args = mock_send.call_args[0]
+        assert call_args[1] == 1001
+        # Must not claim analysis has started
+        assert "looking at" not in call_args[2]
+        assert "support" in call_args[2].lower() or "provider" in call_args[2].lower()
 
     @patch("src.telegram.router.send_message", new_callable=AsyncMock)
     def test_webhook_returns_non_2xx_when_send_message_raises(self, mock_send):

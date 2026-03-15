@@ -15,6 +15,9 @@ router = APIRouter(prefix="/telegram", tags=["telegram"])
 _MSG_ANALYSING = (
     "Got it! I'm looking at the listing at {url} — I'll get back to you shortly."
 )
+_MSG_UNSUPPORTED = (
+    "Sorry, I don't support that listing provider yet. Please send an Airbnb link."
+)
 _MSG_HELP = (
     "Please send a rental listing URL (e.g. an Airbnb link) and I'll analyse it for you."
 )
@@ -44,6 +47,8 @@ async def webhook(request: Request, update: TelegramUpdate) -> dict:
 
     if decision["action"] == "analyse":
         text = _MSG_ANALYSING.format(url=decision["url"])
+    elif decision["action"] == "unsupported":
+        text = _MSG_UNSUPPORTED
     else:
         text = _MSG_HELP
 
