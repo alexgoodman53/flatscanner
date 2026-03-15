@@ -2,7 +2,7 @@
 
 ## Summary
 
-Add a lightweight orchestration layer where Codex can launch Claude CLI locally in isolated git worktrees, while keeping PR creation, GitHub checks, and Codex review as the durable delivery path.
+Add a lightweight orchestration layer where Codex can launch Claude CLI locally in isolated git worktrees, while keeping PR creation, GitHub checks, and AI review as the durable delivery path.
 
 ## Files And Areas
 
@@ -23,7 +23,7 @@ Add a lightweight orchestration layer where Codex can launch Claude CLI locally 
 3. Codex launches Claude CLI in that worktree with a narrow prompt
 4. Claude implements the task, validates it, and commits locally
 5. Claude or Codex publishes the branch to GitHub and opens or reuses a PR
-6. Existing `baseline-checks`, `guard`, `codex-review`, and human approval remain unchanged
+6. Existing `baseline-checks`, `guard`, `AI Review`, and human approval remain unchanged
 
 ## Risks
 

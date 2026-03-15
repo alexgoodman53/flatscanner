@@ -14,5 +14,5 @@
 
 ## Review Notes
 
-- Codex review considerations:
+- AI review considerations:
 - Follow-up work:

@@ -31,7 +31,7 @@ Default expectations:
 - Keep pull requests small and reviewable
 - If implementation changes agreed scope or behavior, update the relevant docs and spec artifacts first
 - Review pull requests created by implementation agents before merge
-- Operate automated PR review through the repository self-hosted runner configuration
+- Operate automated PR review through the repository self-hosted runner configuration, with the active reviewer selected only through the repository variable `AI_REVIEW_AGENT`
 - Orchestrate local Claude Code workers when parallel implementation throughput is useful
 - Stay with an orchestrated implementation loop until the resulting pull request is either merge-ready or explicitly paused by the user
 - Treat CI/CD, review automation, and workflow-health fixes as part of the same task when they block merge readiness
@@ -48,7 +48,7 @@ Default expectations:
 - Open pull requests for code changes instead of pushing directly to `main`
 - Keep code changes scoped to the assigned task list
 - Update `specs/<feature-id>/tasks.md` as implementation work lands
-- Do not merge pull requests without Codex review and the required GitHub checks
+- Do not merge pull requests without the required AI review and GitHub checks
 - When launched locally by Codex, stay inside the assigned branch and isolated worktree
 
 ## Responsibility Boundaries

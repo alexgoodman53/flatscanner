@@ -9,7 +9,7 @@ The repository needs a reliable operating model for AI-assisted delivery: Codex 
 - Record explicit responsibilities for Codex and Claude Code
 - Define the pull-request based delivery flow for AI-authored changes
 - Add repository files that support automated PR review and consistent PR structure
-- Replace the placeholder AI review workflow with a self-hosted local Codex review pipeline
+- Replace the placeholder AI review workflow with a self-hosted local AI review pipeline
 - Document the required GitHub branch protection and runner settings
 
 ## Out Of Scope
@@ -23,7 +23,7 @@ The repository needs a reliable operating model for AI-assisted delivery: Codex 
 - Codex must be documented as architect, reviewer, and CI/CD owner
 - Claude Code must be documented as the primary implementation agent for product code
 - Codex must be allowed to commit process-only changes such as docs, specs, ADRs, and GitHub workflows
-- Pull requests must run CI, PR guard, and automated Codex review
+- Pull requests must run CI, PR guard, and automated AI review
 - The AI review workflow must run on a self-hosted runner and post review output back to the pull request
 - The repository must provide a repeatable PR template for AI-authored changes
 
@@ -31,7 +31,7 @@ The repository needs a reliable operating model for AI-assisted delivery: Codex 
 
 - Agent instructions clearly separate Codex and Claude responsibilities
 - A durable ADR records the AI delivery model
-- A PR-triggered GitHub Actions workflow runs Codex review through a self-hosted runner
+- A PR-triggered GitHub Actions workflow runs AI review through a self-hosted runner
 - The repository contains the local review scripts needed by the self-hosted runner
 - A pull request template exists for AI-authored changes
 - Repository docs identify the GitHub settings needed to make the workflow enforceable

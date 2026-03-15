@@ -16,16 +16,17 @@ Adopt the following AI development workflow:
 - Claude Code is the primary implementation agent for product code
 - Product code changes should land through Claude-authored pull requests instead of direct pushes to `main`
 - Codex may directly commit durable docs, specs, ADRs, GitHub workflow files, templates, and other non-product process files
-- Every pull request must pass CI, PR guard checks, and automated Codex review before merge
+- Every pull request must pass CI, PR guard checks, and automated AI review before merge
 - A human remains the final merge authority through GitHub branch protection and pull request approval rules
-- Automated Codex review runs on a self-hosted Windows GitHub runner with a local Codex CLI adapter
+- Automated AI review runs on a self-hosted Windows GitHub runner with a local Claude or Codex CLI adapter selected only from the repository variable `AI_REVIEW_AGENT`
+- Supported `AI_REVIEW_AGENT` values are `claude` and `codex`, and the fallback default is `claude`
 
 ## Workflow Shape
 
 1. Work is scoped in `specs/<feature-id>/`
 2. Claude implements the approved task in a branch and opens a pull request
-3. GitHub Actions runs CI, PR guard checks, and Codex review automatically
-4. The self-hosted runner checks out the pull request, builds the review prompt, invokes the local Codex adapter, and posts the result back to the pull request
+3. GitHub Actions runs CI, PR guard checks, and AI review automatically
+4. The self-hosted runner checks out the pull request, reads `AI_REVIEW_AGENT`, invokes the selected local review adapter, and posts the result back to the pull request
 5. A human reviews the result and merges only after required checks are green
 
 ## Required GitHub Settings
@@ -46,4 +47,4 @@ Configure the repository with these settings in GitHub:
 - Architecture decisions remain separated from implementation throughput
 - The repository keeps a human-controlled merge gate while still benefiting from automated AI review
 - GitHub configuration becomes part of the architecture and must be maintained like other durable process assets
-- The repository no longer depends on a hosted Codex action or OpenAI API secret for PR review once the local runner is configured
+- The repository no longer depends on a hosted review action once the local runner and the selected local reviewer CLI are configured

@@ -17,23 +17,6 @@ function Write-Diagnostic {
     Add-Content -Path $script:diagnosticPath -Value $line
 }
 
-function Invoke-NativeCommand {
-    param(
-        [Parameter(Mandatory = $true)]
-        [scriptblock]$Command,
-        [Parameter(Mandatory = $true)]
-        [string]$Description
-    )
-
-    Write-Diagnostic "Starting native command: $Description"
-    & $Command
-    $nativeExitCode = $LASTEXITCODE
-    Write-Diagnostic "Completed native command: $Description (exit=$nativeExitCode)"
-    if ($nativeExitCode -ne 0) {
-        throw "$Description failed with exit code $nativeExitCode."
-    }
-}
-
 try {
     if (Test-Path $script:diagnosticPath) {
         Remove-Item $script:diagnosticPath -Force
@@ -51,8 +34,12 @@ try {
     $githubToken = $env:GITHUB_TOKEN
     $repository = $env:GITHUB_REPOSITORY
     $marker = '<!-- ai-review -->'
-    $legacyMarker = '<!-- codex-ai-review -->'
-    $agentLabel = 'Codex'
+    $agentLabel = 'Claude'
+    $claudePath = if ($env:CLAUDE_CLI_PATH) { $env:CLAUDE_CLI_PATH } else { 'C:\Users\User\.local\bin\claude.exe' }
+
+    if (-not (Test-Path $claudePath)) {
+        throw "Claude CLI not found at $claudePath"
+    }
 
     if (-not $eventPath -or -not (Test-Path $eventPath)) {
         throw 'GITHUB_EVENT_PATH is missing. This script must run inside GitHub Actions.'
@@ -96,17 +83,55 @@ try {
 
     Write-Diagnostic "Preparing review context for PR #$prNumber ($baseSha..$headSha)"
 
-    Invoke-NativeCommand -Description "git fetch origin $baseRef" -Command { git fetch --no-tags origin $baseRef }
-    Invoke-NativeCommand -Description "git fetch PR head refs/pull/$prNumber/head" -Command { git fetch --no-tags origin "+refs/pull/$prNumber/head:refs/remotes/origin/pr/$prNumber" }
+    git fetch --no-tags origin $baseRef
+    if ($LASTEXITCODE -ne 0) {
+        throw "git fetch origin $baseRef failed with exit code $LASTEXITCODE."
+    }
+
+    git fetch --no-tags origin "+refs/pull/$prNumber/head:refs/remotes/origin/pr/$prNumber"
+    if ($LASTEXITCODE -ne 0) {
+        throw "git fetch PR head refs/pull/$prNumber/head failed with exit code $LASTEXITCODE."
+    }
 
     $changedFiles = git diff --name-only $baseSha $headSha
     $changedFilesBlock = if ($changedFiles) { ($changedFiles -join [Environment]::NewLine) } else { '(no changed files reported)' }
+    $diffBlock = git diff --unified=3 $baseSha $headSha
+    if (-not $diffBlock) {
+        $diffBlock = '(no diff reported)'
+    }
 
-    $runtimePrompt = Join-Path $script:tempRoot 'ai-review-prompt.md'
-    $templatePrompt = Join-Path $repoRoot '.github\codex\prompts\pr-review.md'
-    $schemaPath = Join-Path $repoRoot '.github\review\schemas\pr-review.schema.json'
-    $outputPath = Join-Path $script:tempRoot 'ai-review-output.json'
+    $contextFiles = @(
+        '.specify/memory/constitution.md',
+        'docs/README.md',
+        'docs/project-idea.md',
+        'docs/project/frontend/frontend-docs.md',
+        'docs/project/backend/backend-docs.md'
+    )
 
+    $adrFiles = Get-ChildItem (Join-Path $repoRoot 'docs\adr') -Filter '*.md' | Sort-Object Name | ForEach-Object {
+        $_.FullName.Substring($repoRoot.Length + 1)
+    }
+
+    $specFiles = @()
+    if ($changedFiles) {
+        $specFiles = $changedFiles | Where-Object { $_ -like 'specs/*/spec.md' -or $_ -like 'specs/*/plan.md' -or $_ -like 'specs/*/tasks.md' }
+    }
+
+    $governingFiles = @($contextFiles + $adrFiles + $specFiles) | Where-Object { $_ } | Select-Object -Unique
+    $contextBlocks = foreach ($relativePath in $governingFiles) {
+        $normalizedPath = $relativePath -replace '^[.][\\/]', ''
+        $fullPath = Join-Path $repoRoot $normalizedPath
+        if (Test-Path $fullPath) {
+            @(
+                "### File: $normalizedPath",
+                (Get-Content $fullPath -Raw)
+            ) -join [Environment]::NewLine
+        }
+    }
+    $contextBlock = if ($contextBlocks) { $contextBlocks -join ([Environment]::NewLine + [Environment]::NewLine) } else { 'No governing context files were loaded.' }
+
+    $runtimePrompt = Join-Path $script:tempRoot 'claude-review-prompt.md'
+    $templatePrompt = Join-Path $repoRoot '.github\claude\prompts\pr-review.md'
     $template = Get-Content $templatePrompt -Raw
     $runtimeSection = @"
 
@@ -123,41 +148,76 @@ try {
 ### Changed Files
 $changedFilesBlock
 
-Review the git diff between $baseSha and $headSha only, but use the repository docs and specs as governing context.
-You may inspect repository files and run read-only git commands if needed.
+## Governing Context
+
+$contextBlock
+
+## Unified Diff
+
+$diffBlock
 "@
     Set-Content -Path $runtimePrompt -Value ($template + $runtimeSection)
     Write-Diagnostic "Runtime prompt written to $runtimePrompt"
 
-    Write-Diagnostic 'Running local Codex CLI review'
-    if (Test-Path $outputPath) {
-        Remove-Item $outputPath -Force
-        Write-Diagnostic "Removed stale output file $outputPath"
+    $promptText = (Get-Content $runtimePrompt -Raw).Trim()
+
+    Write-Diagnostic 'Running local Claude CLI review'
+    # Claude CLI expects the literal string '""' to disable tools in print mode on Windows.
+    $noTools = '""'
+    $resultText = $promptText | & $claudePath -p --output-format text --permission-mode default --tools $noTools
+    $claudeExitCode = $LASTEXITCODE
+    Write-Diagnostic "claude review completed with exit code $claudeExitCode"
+
+    if ($claudeExitCode -ne 0) {
+        throw "Claude CLI review failed with exit code $claudeExitCode."
     }
 
-    Get-Content $runtimePrompt -Raw | codex exec - --output-schema $schemaPath --output-last-message $outputPath --sandbox read-only --color never --ephemeral -C $repoRoot
-    $codexExitCode = $LASTEXITCODE
-    Write-Diagnostic "codex exec completed with exit code $codexExitCode"
-
-    if ($codexExitCode -ne 0) {
-        throw "codex exec failed with exit code $codexExitCode."
+    $resultText = $resultText.Trim()
+    if (-not $resultText) {
+        throw 'Claude review output was empty.'
     }
 
-    if (-not (Test-Path $outputPath)) {
-        throw 'AI review did not produce an output file.'
+    if ($resultText.StartsWith('```')) {
+        $resultText = ($resultText -replace '^```[a-zA-Z0-9_-]*\s*', '' -replace '\s*```$', '').Trim()
     }
 
-    $outputMetadata = Get-Item $outputPath
-    Write-Diagnostic "Codex output file present at $outputPath (size=$($outputMetadata.Length))"
+    if (-not $resultText.StartsWith('{')) {
+        $jsonStart = $resultText.IndexOf('{')
+        $jsonEnd = $resultText.LastIndexOf('}')
+        if ($jsonStart -ge 0 -and $jsonEnd -gt $jsonStart) {
+            $resultText = $resultText.Substring($jsonStart, ($jsonEnd - $jsonStart + 1)).Trim()
+        }
+    }
 
-    $result = Get-Content $outputPath -Raw | ConvertFrom-Json
+    try {
+        $result = $resultText | ConvertFrom-Json
+    }
+    catch {
+        throw "Claude review output was not valid JSON: $resultText"
+    }
+
     if (-not $result.summary -or -not $result.verdict) {
-        throw 'AI review output is missing required fields.'
+        throw 'Claude review output is missing required fields.'
+    }
+
+    # Keep the Claude adapter aligned with the shared review schema contract.
+    if (@('approve', 'comment', 'request_changes') -notcontains [string]$result.verdict) {
+        throw "Claude review output contains an invalid verdict: $($result.verdict)"
     }
 
     $findings = @()
     if ($result.findings) {
         $findings = @($result.findings)
+    }
+
+    foreach ($finding in $findings) {
+        if (-not $finding.severity -or -not $finding.file -or $null -eq $finding.line -or -not $finding.title -or -not $finding.body) {
+            throw 'Claude review output contains a finding with missing required fields.'
+        }
+        $lineNumber = $finding.line -as [int]
+        if ($null -ne $lineNumber -and $lineNumber -lt 1) {
+            throw 'Claude review output contains a finding with an invalid line number.'
+        }
     }
 
     Write-Diagnostic "Review verdict=$($result.verdict); findings=$($findings.Count)"
@@ -200,6 +260,7 @@ $findingsBlock
 "@
 
     $commentsUrl = "https://api.github.com/repos/$repository/issues/$prNumber/comments"
+    $legacyMarker = '<!-- codex-ai-review -->'
     $comments = Invoke-RestMethod -Headers $headers -Uri $commentsUrl -Method Get
     $existing = $comments | Where-Object { $_.body -like "*$marker*" -or $_.body -like "*$legacyMarker*" } | Select-Object -First 1
     $payload = @{ body = $body } | ConvertTo-Json
@@ -218,7 +279,7 @@ $findingsBlock
         throw 'AI review requested changes.'
     }
 
-    Write-Diagnostic 'Codex AI review completed successfully'
+    Write-Diagnostic 'Claude AI review completed successfully'
     $script:exitCode = 0
 }
 catch {

@@ -45,14 +45,14 @@ Bad candidates for parallel workers:
 3. Codex creates an isolated worktree with `scripts/new-claude-worktree.ps1`
 4. Codex starts Claude in that worktree with `scripts/start-claude-worker.ps1`
 5. Claude implements the task and may call `scripts/publish-claude-branch.ps1`
-6. GitHub runs `baseline-checks`, `guard`, and `codex-review`
+6. GitHub runs `baseline-checks`, `guard`, and `AI Review`
 7. If needed, Codex triggers follow-up fixes through the existing `claude-fix` PR workflow
 8. Codex keeps following that same PR until it is merge-ready or the user explicitly pauses the loop
 
 The loop is still active while any of these are true:
 
 - required checks are queued or running
-- `codex-review` has not finished on the current head SHA
+- `AI Review` has not finished on the current head SHA
 - the PR has merge conflicts
 - a required check is red for either product code or workflow reasons
 
@@ -105,7 +105,7 @@ All worker output still goes through:
 
 - `baseline-checks`
 - `guard`
-- `codex-review`
+- `AI Review`
 - human approval
 
 Codex keeps review authority even when Codex also launched the worker.
@@ -127,7 +127,7 @@ For now, the cleanest operating pattern is:
 
 1. Run one implementation worker
 2. Let it open one PR
-3. Let GitHub and Codex review finish
+3. Let GitHub and AI review finish
 4. Use `claude-fix` on the same branch if needed
 5. Merge before launching the next overlapping product task
 
@@ -137,7 +137,7 @@ For Codex specifically, launching the worker is not the end of the job. The loop
 
 - no merge conflicts
 - green required checks on the current head SHA
-- a clear Codex review result
+- a clear AI review result
 - human approval pending final merge
 
 Codex must not treat "latest fix pushed" or "only CI/workflow cleanup remains" as enough to stop. Those are still active loop states.

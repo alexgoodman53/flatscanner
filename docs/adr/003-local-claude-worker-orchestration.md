@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The repository already supports Claude-authored pull requests and Codex review through a self-hosted runner. The team wants Codex to act as an orchestrator that can launch Claude Code locally for scoped implementation tasks and, when useful, run more than one implementation worker in parallel.
+The repository already supports Claude-authored pull requests and automated AI review through a self-hosted runner. The team wants Codex to act as an orchestrator that can launch Claude Code locally for scoped implementation tasks and, when useful, run more than one implementation worker in parallel.
 
 Running several coding agents in the same working tree is unsafe. It causes branch confusion, index conflicts, and hidden file overlap. The orchestration layer therefore needs a simple isolation model that stays compatible with the current PR workflow.
 
@@ -29,8 +29,8 @@ Adopt a local Claude worker orchestration model with these rules:
 3. Codex launches Claude CLI in that worktree with a narrow task prompt
 4. Claude implements the task, updates relevant specs and tests, and pushes the worker branch
 5. Claude opens or updates the pull request for that branch
-6. GitHub Actions runs `baseline-checks`, `guard`, and `codex-review`
-7. Codex reviews the PR and may trigger follow-up Claude fixes on the same branch
+6. GitHub Actions runs `baseline-checks`, `guard`, and `AI Review`
+7. Codex monitors the PR and may trigger follow-up Claude fixes on the same branch after AI review runs
 8. A human merges after required checks and approval
 
 ## Guardrails

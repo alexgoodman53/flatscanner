@@ -5,7 +5,9 @@ $eventPath = $env:GITHUB_EVENT_PATH
 $githubToken = $env:GITHUB_TOKEN
 $repository = $env:GITHUB_REPOSITORY
 $marker = '<!-- claude-pr-fix -->'
-$claudePath = 'C:\Users\User\.local\bin\claude.exe'
+$reviewMarker = '<!-- ai-review -->'
+$legacyReviewMarker = '<!-- codex-ai-review -->'
+$claudePath = if ($env:CLAUDE_CLI_PATH) { $env:CLAUDE_CLI_PATH } else { 'C:\Users\User\.local\bin\claude.exe' }
 
 if (-not (Test-Path $claudePath)) {
     throw "Claude CLI not found at $claudePath"
@@ -41,8 +43,8 @@ $runId = if ($env:GITHUB_RUN_ID) { $env:GITHUB_RUN_ID } else { 'local' }
 $runAttempt = if ($env:GITHUB_RUN_ATTEMPT) { $env:GITHUB_RUN_ATTEMPT } else { '1' }
 $triggerSource = if ($env:TRIGGER_LABEL) { "label:$($env:TRIGGER_LABEL)" } elseif ($event.issue -and $event.comment) { 'comment:/claude-fix' } else { 'workflow_dispatch' }
 
-$codexReview = $issueComments | Where-Object { $_.body -like '*<!-- codex-ai-review -->*' } | Select-Object -Last 1
-$humanIssueComments = $issueComments | Where-Object { $_.body -notlike '*<!-- codex-ai-review -->*' -and $_.body -notlike '*<!-- claude-pr-fix -->*' }
+$aiReview = $issueComments | Where-Object { $_.body -like "*$reviewMarker*" -or $_.body -like "*$legacyReviewMarker*" } | Select-Object -Last 1
+$humanIssueComments = $issueComments | Where-Object { $_.body -notlike "*$reviewMarker*" -and $_.body -notlike "*$legacyReviewMarker*" -and $_.body -notlike '*<!-- claude-pr-fix -->*' }
 
 $changedFiles = git diff --name-only "origin/$baseRef...HEAD"
 $changedFilesBlock = if ($changedFiles) { ($changedFiles -join [Environment]::NewLine) } else { '(no changed files reported)' }
@@ -51,7 +53,7 @@ $promptTemplate = Get-Content (Join-Path $repoRoot '.github\claude\prompts\pr-fi
 $runtimePrompt = Join-Path $env:RUNNER_TEMP 'claude-pr-fix-prompt.md'
 $outputPath = Join-Path $env:RUNNER_TEMP 'claude-pr-fix-output.json'
 
-$codexBlock = if ($codexReview) { $codexReview.body } else { 'No Codex review comment found.' }
+$aiReviewBlock = if ($aiReview) { $aiReview.body } else { 'No AI review comment found.' }
 $humanIssueBlock = if ($humanIssueComments) { ($humanIssueComments | ForEach-Object { "- @$($_.user.login):`n$($_.body)" }) -join ([Environment]::NewLine + [Environment]::NewLine) } else { 'No additional issue comments.' }
 $reviewCommentBlock = if ($reviewComments) { ($reviewComments | ForEach-Object { "- @$($_.user.login) on $($_.path):`n$($_.body)" }) -join ([Environment]::NewLine + [Environment]::NewLine) } else { 'No inline review comments.' }
 
@@ -68,8 +70,8 @@ $runtimeSection = @"
 ### Changed Files
 $changedFilesBlock
 
-### Sticky Codex Review Comment
-$codexBlock
+### Sticky AI Review Comment
+$aiReviewBlock
 
 ### Issue Comments
 $humanIssueBlock

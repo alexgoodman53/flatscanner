@@ -1,11 +1,11 @@
 # AI Pull Request Workflow
 
-This document describes the operating loop between Claude Code, Codex review, GitHub Actions, and the human merge decision.
+This document describes the operating loop between Claude Code, automated AI review, GitHub Actions, and the human merge decision.
 
 ## Roles
 
 - Claude Code writes product code and opens pull requests
-- Codex owns architecture, review, and CI/CD policy
+- Codex owns architecture, review policy, and CI/CD policy
 - GitHub Actions enforces automated checks
 - A human remains the final merge authority
 
@@ -19,8 +19,8 @@ Codex may also launch Claude workers locally through CLI, but those workers stil
 4. Claude implements the scoped task in a feature branch created from current `main`
 5. Claude updates `tasks.md` and any required `docs/` or spec files in the same PR
 6. Claude opens a pull request using the repository template
-7. GitHub Actions runs `baseline-checks`, `guard`, and `codex-review`
-8. Codex posts or updates a sticky AI review comment in the pull request
+7. GitHub Actions runs `baseline-checks`, `guard`, and `AI Review`
+8. The selected AI reviewer posts or updates a sticky AI review comment in the pull request
 9. If fixes are needed, trigger Claude on the same PR by either adding the `claude-fix` label or commenting `/claude-fix`
 10. Claude reads the review findings, updates the same branch, and pushes follow-up commits
 11. GitHub reruns the checks automatically on the updated branch
@@ -46,11 +46,11 @@ Codex may stop only when one of these is true:
 
 ## How Claude Should Handle Review Feedback
 
-- Treat the Codex review comment as the authoritative machine-review summary for the PR iteration
+- Treat the sticky AI review comment as the authoritative machine-review summary for the PR iteration
 - Read both the verdict and the individual findings
 - Update the same PR branch rather than opening a replacement PR
 - Resolve the code issue and also resolve missing docs, tests, or spec updates when called out
-- Push the follow-up commits and wait for a fresh `codex-review` run
+- Push the follow-up commits and wait for a fresh `AI Review` run
 - Repeat until the review is clear enough for human approval
 
 ## Automated Claude Fix Trigger
@@ -77,13 +77,14 @@ Guardrails:
 - one PR per worker branch
 - no more than three concurrent workers unless a future ADR changes the limit
 
-## How Codex Review Appears
+## How AI Review Appears
 
-- The self-hosted runner executes local `codex exec` on every non-draft PR update
-- The workflow posts a sticky comment marked with `<!-- codex-ai-review -->`
+- The self-hosted runner executes the local reviewer selected by `AI_REVIEW_AGENT` on every non-draft PR update
+- `AI_REVIEW_AGENT` supports `claude` and `codex`, and falls back to `claude` when missing or invalid
+- The workflow posts a sticky comment marked with `<!-- ai-review -->`
 - The same comment is updated on subsequent pushes, so the PR keeps one current review summary instead of accumulating many stale comments
 - `Claude Fix PR` is intentionally different: each fix run posts a fresh comment instead of overwriting the prior one, so maintainers can audit the iteration history in the PR thread
-- If the review verdict is `request_changes`, the `codex-review` check fails and blocks merge
+- If the review verdict is `request_changes`, the `AI Review` check fails and blocks merge
 - The review step must be launched through an explicit `powershell -File` invocation rather than relying on inline shell execution
 - The workflow must always print the review diagnostic and transcript logs after the review step so false-negative job failures can be traced from the GitHub run itself
 - Those diagnostic files must be recreated per run on the self-hosted runner so operators never read stale output from an earlier PR or an earlier retry
@@ -92,7 +93,7 @@ Guardrails:
 
 - `baseline-checks`
 - `guard`
-- `codex-review`
+- `AI Review`
 
 ## Merge Rule
 
@@ -117,7 +118,7 @@ Use automation for review and for follow-up fixes, but treat merge readiness as 
 
 - the current PR head SHA
 - the current required check results on that SHA
-- the latest sticky Codex review comment
+- the latest sticky AI review comment
 - human approval
 
 That keeps the process resilient even when the automation layer itself is being improved in parallel with product work.
